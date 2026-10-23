@@ -2,7 +2,7 @@
 
 ## Consigna del TPO
 
-Transcripción de [`tpo-consignas.pdf`](../tpo-consignas.pdf), dividida por tema. Si algo de acá contradice al PDF, gana el PDF.
+Transcripción de `tpo-consignas.pdf` (no se versiona; cada integrante lo tiene localmente en la raíz del proyecto), dividida por tema. Si algo de acá contradice al PDF, gana el PDF.
 
 | Archivo | Contenido |
 |---|---|
