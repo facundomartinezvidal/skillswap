@@ -1,0 +1,33 @@
+# Maven
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+._*
+__MACOSX/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Logs y salidas locales
+*.log
+out.png
+
+# Configuración local (credenciales de la base, etc.)
+*.local.properties
+.env
