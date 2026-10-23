@@ -31,3 +31,6 @@ out.png
 # Configuración local (credenciales de la base, etc.)
 *.local.properties
 .env
+
+# PDFs (consigna e informes)
+*.pdf
