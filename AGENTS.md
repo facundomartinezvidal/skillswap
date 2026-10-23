@@ -10,7 +10,7 @@ La cátedra entrega una interfaz Swing con datos mock. **El trabajo del equipo e
 
 ## Consigna (leer antes de diseñar o implementar)
 
-La consigna completa está transcripta en [`docs/consigna/`](docs/consigna/), con un archivo por tema. El original es [`tpo-consignas.pdf`](tpo-consignas.pdf); si algo no coincide, gana el PDF.
+La consigna completa está transcripta en [`docs/consigna/`](docs/consigna/), con un archivo por tema. El original es `tpo-consignas.pdf`, que no se versiona (los PDF están en `.gitignore`): pedíselo al equipo y guardalo en la raíz del proyecto. Si algo no coincide, gana el PDF.
 
 | Si vas a trabajar en… | Leé |
 |---|---|
