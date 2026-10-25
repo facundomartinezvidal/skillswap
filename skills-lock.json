@@ -2,16 +2,10 @@
   "version": 1,
   "skills": {
     "clean-architecture": {
-      "source": "wondelai/skills",
+      "source": "facundomartinezvidal/skills",
       "sourceType": "github",
       "skillPath": "clean-architecture/SKILL.md",
-      "computedHash": "41bc54cd69d52698ca747529a148d971e23587cc872db58f715b59de95ef51e6"
-    },
-    "domain-driven-design": {
-      "source": "wondelai/skills",
-      "sourceType": "github",
-      "skillPath": "domain-driven-design/SKILL.md",
-      "computedHash": "59c101a9dc2e7b4cb1d20287bd2f0e9e5ef69315b7c25f477dd5cafb414f57cb"
+      "computedHash": "4dbd5fa6daf1305f0ca6dc214cf990773a31f48c4a8785cd5371fbb5bfdb3957"
     }
   }
 }

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: design-clinic-booking-app
+expected_outcome: |
+  A project structure organized around the clinic domain and its actors, with framework-free entities and use cases, ports owned by the inner layers and adapters for Postgres, WhatsApp and email, a dependency diagram pointing inward, insurance billing treated as a deferred or partial boundary, and a way to enforce the layout.

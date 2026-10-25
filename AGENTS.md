@@ -103,7 +103,12 @@ Si se cambia el contrato, hay que adaptar `MockSkillSwapControllers` y `SkillSwa
 
 ## Skills disponibles
 
-Instaladas en `.agents/skills/` y registradas en `skills-lock.json`:
+Instaladas en `.claude/skills/` y registradas en `skills-lock.json`:
 
-- `clean-architecture` (wondelai): regla de dependencias, capas, SOLID y un diagnóstico de 0 a 10.
-- `domain-driven-design` (wondelai): agregados, value objects, eventos de dominio y lenguaje ubicuo.
+- `clean-architecture` ([facundomartinezvidal/skills](https://github.com/facundomartinezvidal/skills)): revisa, diseña y explica la estructura del software según *Clean Architecture* (regla de dependencias, capas, puertos y adaptadores, SOLID y principios de componentes).
+
+Para reinstalarla o actualizarla:
+
+```bash
+npx skills add facundomartinezvidal/skills --skill clean-architecture -a claude-code
+```

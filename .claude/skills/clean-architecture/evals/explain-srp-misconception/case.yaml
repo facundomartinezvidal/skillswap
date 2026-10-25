@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: explain-srp-misconception
+expected_outcome: |
+  An explanation that defines SRP as responsibility to a single actor, separates it from the "do one thing" rule for functions, shows a TypeScript example split by actor and explains what goes wrong when two actors share a module.
