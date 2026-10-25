@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: review-coupled-express-api
+expected_outcome: |
+  An architecture review that finds the framework, ORM and SDK dependencies inside the use case, the ORM document leaking out to the HTTP response, the placeOrder/billing cycle and the duplicated discount rule behind the total mismatch, and proposes concrete fixes scaled to a small codebase.
+context:
+  scaffold_script: place-files.sh
