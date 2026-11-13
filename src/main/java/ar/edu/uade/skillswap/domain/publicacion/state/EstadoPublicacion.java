@@ -1,9 +1,11 @@
-package ar.edu.uade.skillswap.domain.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion.state;
+
+import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
 
 /**
  * Patrón State. Cada acción devuelve el estado siguiente o lanza
  * {@link TransicionInvalidaException}. Los estados concretos sobrescriben solo lo que permiten.
- * Los estados no tienen efectos: la {@link Publicacion} valida sus requisitos y registra el cambio.
+ * Los estados no tienen efectos: la {@link ar.edu.uade.skillswap.domain.publicacion.Publicacion} valida sus requisitos y registra el cambio.
  */
 public sealed interface EstadoPublicacion
         permits Borrador, Publicada, Pausada, Cerrada, Cancelada {

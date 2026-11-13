@@ -22,7 +22,7 @@ Fecha: 2026-11-11. Alcance: modelo de dominio del agregado `Publicacion` (Java p
 
 ## Estructura objetivo
 
-Paquete: `ar.edu.uade.skillswap.domain.publicacion`; `SkillCoins` y `DomainException` en `ar.edu.uade.skillswap.domain.shared`. Sin JPA, sin Swing.
+Paquete: `ar.edu.uade.skillswap.domain.publicacion`, con los estados en `.state` y las excepciones en `.exception`; `SkillCoins` y `DomainException` en `ar.edu.uade.skillswap.domain.shared`. Sin JPA, sin Swing.
 
 ```mermaid
 classDiagram

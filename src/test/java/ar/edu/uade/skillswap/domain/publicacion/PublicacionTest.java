@@ -1,5 +1,9 @@
 package ar.edu.uade.skillswap.domain.publicacion;
 
+import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
+import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
+import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
+import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 
 import org.junit.jupiter.api.Nested;
@@ -466,19 +470,15 @@ class PublicacionTest {
 
     @Test
     void elDominioNoImportaJpaNiSwing() throws IOException {
-        var domainPackages = List.of(
-                Path.of("src/main/java/ar/edu/uade/skillswap/domain/publicacion"),
-                Path.of("src/main/java/ar/edu/uade/skillswap/domain/shared"));
-        for (var packageDir : domainPackages) {
-            try (var files = Files.list(packageDir)) {
-                var sourceFiles = files.filter(file -> file.toString().endsWith(".java")).toList();
-                assertFalse(sourceFiles.isEmpty(), packageDir.toString());
-                for (var file : sourceFiles) {
-                    var source = Files.readString(file);
-                    assertFalse(source.contains("jakarta.persistence"), file.toString());
-                    assertFalse(source.contains("javax.persistence"), file.toString());
-                    assertFalse(source.contains("javax.swing"), file.toString());
-                }
+        var domainDir = Path.of("src/main/java/ar/edu/uade/skillswap/domain");
+        try (var files = Files.walk(domainDir)) {
+            var sourceFiles = files.filter(file -> file.toString().endsWith(".java")).toList();
+            assertFalse(sourceFiles.isEmpty(), domainDir.toString());
+            for (var file : sourceFiles) {
+                var source = Files.readString(file);
+                assertFalse(source.contains("jakarta.persistence"), file.toString());
+                assertFalse(source.contains("javax.persistence"), file.toString());
+                assertFalse(source.contains("javax.swing"), file.toString());
             }
         }
     }

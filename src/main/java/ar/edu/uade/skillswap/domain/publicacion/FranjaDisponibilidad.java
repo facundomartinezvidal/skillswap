@@ -1,5 +1,8 @@
 package ar.edu.uade.skillswap.domain.publicacion;
 
+import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
+import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
+
 import java.time.Instant;
 import java.util.Objects;
 

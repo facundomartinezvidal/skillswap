@@ -1,5 +1,10 @@
 package ar.edu.uade.skillswap.domain.publicacion;
 
+import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
+import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
+import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
+import ar.edu.uade.skillswap.domain.publicacion.state.Borrador;
+import ar.edu.uade.skillswap.domain.publicacion.state.EstadoPublicacion;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 
 import java.time.Duration;
