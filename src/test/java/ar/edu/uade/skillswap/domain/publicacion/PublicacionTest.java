@@ -1,4 +1,6 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
+
+import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -437,7 +439,7 @@ class PublicacionTest {
         void reservarEnUnaFranjaAjenaFalla() {
             var publicacion = publicada();
 
-            assertThrows(FranjaInvalidaException.class, () -> publicacion.reservarCupo(FranjaId.nueva()));
+            assertThrows(FranjaInvalidaException.class, () -> publicacion.reservarCupo(FranjaId.generate()));
         }
 
         @Test
@@ -464,13 +466,19 @@ class PublicacionTest {
 
     @Test
     void elDominioNoImportaJpaNiSwing() throws IOException {
-        var paquete = Path.of("src/main/java/ar/edu/uade/skillswap/dominio/publicacion");
-        try (var archivos = Files.list(paquete)) {
-            for (var archivo : archivos.toList()) {
-                var codigo = Files.readString(archivo);
-                assertFalse(codigo.contains("jakarta.persistence"), archivo.toString());
-                assertFalse(codigo.contains("javax.persistence"), archivo.toString());
-                assertFalse(codigo.contains("javax.swing"), archivo.toString());
+        var domainPackages = List.of(
+                Path.of("src/main/java/ar/edu/uade/skillswap/domain/publicacion"),
+                Path.of("src/main/java/ar/edu/uade/skillswap/domain/shared"));
+        for (var packageDir : domainPackages) {
+            try (var files = Files.list(packageDir)) {
+                var sourceFiles = files.filter(file -> file.toString().endsWith(".java")).toList();
+                assertFalse(sourceFiles.isEmpty(), packageDir.toString());
+                for (var file : sourceFiles) {
+                    var source = Files.readString(file);
+                    assertFalse(source.contains("jakarta.persistence"), file.toString());
+                    assertFalse(source.contains("javax.persistence"), file.toString());
+                    assertFalse(source.contains("javax.swing"), file.toString());
+                }
             }
         }
     }

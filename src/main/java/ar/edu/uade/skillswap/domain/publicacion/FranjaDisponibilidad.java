@@ -1,4 +1,4 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
 import java.time.Instant;
 import java.util.Objects;

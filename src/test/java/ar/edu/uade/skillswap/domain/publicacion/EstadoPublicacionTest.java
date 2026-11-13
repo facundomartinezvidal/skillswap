@@ -1,4 +1,4 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Matriz completa estado × acción según el diagrama del plan (D1, D2). */
+/** Matriz completa estado × acción de una publicación. */
 class EstadoPublicacionTest {
 
     private static final Map<String, Function<EstadoPublicacion, EstadoPublicacion>> ACCIONES = Map.of(

@@ -1,4 +1,6 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
+
+import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -40,7 +42,7 @@ public final class Publicacion {
             throw new IllegalArgumentException("El autor de la publicación es obligatorio");
         }
         Objects.requireNonNull(tipo, "El tipo de publicación es obligatorio");
-        return new Publicacion(PublicacionId.nueva(), autorId, tipo);
+        return new Publicacion(PublicacionId.generate(), autorId, tipo);
     }
 
     /** Reemplaza el contenido editable. Solo en BORRADOR; los datos pueden quedar incompletos. */
@@ -59,7 +61,7 @@ public final class Publicacion {
 
     public FranjaId agregarFranja(Instant inicio, Instant fin) {
         estado.editar();
-        var nueva = new FranjaDisponibilidad(FranjaId.nueva(), inicio, fin);
+        var nueva = new FranjaDisponibilidad(FranjaId.generate(), inicio, fin);
         for (var existente : franjas) {
             if (existente.seSolapaCon(nueva)) {
                 throw new FranjaInvalidaException("La franja se superpone con otra franja de la publicación");
@@ -75,19 +77,19 @@ public final class Publicacion {
         if (!faltantes.isEmpty()) {
             throw new PublicacionIncompletaException(faltantes);
         }
-        cambiarA(siguiente, actorId, null, ahora);
+        transitionTo(siguiente, actorId, null, ahora);
     }
 
     public void pausar(String actorId, String motivo, Instant ahora) {
-        cambiarA(estado.pausar(), actorId, motivo, ahora);
+        transitionTo(estado.pausar(), actorId, motivo, ahora);
     }
 
     public void reanudar(String actorId, Instant ahora) {
-        cambiarA(estado.reanudar(), actorId, null, ahora);
+        transitionTo(estado.reanudar(), actorId, null, ahora);
     }
 
     public void cerrar(String actorId, String motivo, Instant ahora) {
-        cambiarA(estado.cerrar(), actorId, motivo, ahora);
+        transitionTo(estado.cerrar(), actorId, motivo, ahora);
     }
 
     public void cancelar(String actorId, String motivo, Instant ahora) {
@@ -95,7 +97,7 @@ public final class Publicacion {
         if (motivo == null || motivo.isBlank()) {
             throw new IllegalArgumentException("Cancelar una publicación requiere un motivo");
         }
-        cambiarA(siguiente, actorId, motivo, ahora);
+        transitionTo(siguiente, actorId, motivo, ahora);
         this.motivoCancelacion = motivo;
     }
 
@@ -103,17 +105,17 @@ public final class Publicacion {
         return estado.admiteSolicitudes();
     }
 
-    /** Toma un lugar de la franja (decisión D3: el cupo es por franja). */
+    /** Toma un lugar de la franja (el cupo es por franja). */
     public void reservarCupo(FranjaId franjaId) {
         if (!admiteSolicitudes()) {
             throw new TransicionInvalidaException(estado.nombre(), "reservar cupo en");
         }
-        buscarFranja(franjaId).reservar(cupo);
+        findFranja(franjaId).reservar(cupo);
     }
 
     /** Devuelve un lugar de la franja. Nunca baja de cero. */
     public void liberarCupo(FranjaId franjaId) {
-        buscarFranja(franjaId).liberar();
+        findFranja(franjaId).liberar();
     }
 
     private List<String> requisitosFaltantesParaPublicar() {
@@ -136,13 +138,13 @@ public final class Publicacion {
         return faltantes;
     }
 
-    private void cambiarA(EstadoPublicacion siguiente, String actorId, String motivo, Instant ahora) {
+    private void transitionTo(EstadoPublicacion siguiente, String actorId, String motivo, Instant ahora) {
         var cambio = new CambioEstado(estado.nombre(), siguiente.nombre(), ahora, actorId, motivo);
         historial.add(cambio);
         estado = siguiente;
     }
 
-    private FranjaDisponibilidad buscarFranja(FranjaId franjaId) {
+    private FranjaDisponibilidad findFranja(FranjaId franjaId) {
         return franjas.stream()
                 .filter(f -> f.id().equals(franjaId))
                 .findFirst()

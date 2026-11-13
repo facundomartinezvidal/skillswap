@@ -1,6 +1,8 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
-public class TransicionInvalidaException extends RuntimeException {
+import ar.edu.uade.skillswap.domain.shared.DomainException;
+
+public class TransicionInvalidaException extends DomainException {
 
     private final String estado;
     private final String accion;

@@ -1,4 +1,4 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -9,7 +9,7 @@ public record PublicacionId(UUID valor) {
         Objects.requireNonNull(valor, "El id de la publicación es obligatorio");
     }
 
-    public static PublicacionId nueva() {
+    public static PublicacionId generate() {
         return new PublicacionId(UUID.randomUUID());
     }
 }

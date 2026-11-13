@@ -1,4 +1,4 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
 public record Publicada() implements EstadoPublicacion {
 

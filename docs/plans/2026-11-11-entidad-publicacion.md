@@ -22,7 +22,7 @@ Fecha: 2026-11-11. Alcance: modelo de dominio del agregado `Publicacion` (Java p
 
 ## Estructura objetivo
 
-Paquete: `ar.edu.uade.skillswap.dominio.publicacion`. Sin JPA, sin Swing.
+Paquete: `ar.edu.uade.skillswap.domain.publicacion`; `SkillCoins` y `DomainException` en `ar.edu.uade.skillswap.domain.shared`. Sin JPA, sin Swing.
 
 ```mermaid
 classDiagram
@@ -161,7 +161,7 @@ Cada paso deja `mvn test` en verde y la app abriendo.
 - Cancelar con una `CONFIRMADA`: falla, la publicación sigue en su estado y no se rechaza ninguna `PENDIENTE` (D6b, todo o nada).
 - Cancelar con solo `PENDIENTE`: la publicación pasa a `CANCELADA`, las solicitudes quedan `RECHAZADA` y ningún saldo cambia (D6b).
 - Una `Publicacion` con `HIBRIDA` se guarda y se recupera igual (D5).
-- Ninguna clase de `dominio.publicacion` importa `jakarta.persistence` ni `javax.swing`.
+- Ninguna clase de `domain` importa `jakarta.persistence` ni `javax.swing`.
 
 ## Preguntas abiertas
 

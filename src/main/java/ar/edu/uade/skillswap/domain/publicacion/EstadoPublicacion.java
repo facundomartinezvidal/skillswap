@@ -1,7 +1,7 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
 /**
- * Patrón State (decisión D1). Cada acción devuelve el estado siguiente o lanza
+ * Patrón State. Cada acción devuelve el estado siguiente o lanza
  * {@link TransicionInvalidaException}. Los estados concretos sobrescriben solo lo que permiten.
  * Los estados no tienen efectos: la {@link Publicacion} valida sus requisitos y registra el cambio.
  */

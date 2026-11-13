@@ -1,4 +1,4 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
 
 public record Pausada() implements EstadoPublicacion {
 
@@ -7,7 +7,7 @@ public record Pausada() implements EstadoPublicacion {
         return "PAUSADA";
     }
 
-    /** Decisión D2: una publicación pausada puede volver a publicarse. */
+    /** Una publicación pausada puede volver a publicarse. */
     @Override
     public EstadoPublicacion reanudar() {
         return new Publicada();

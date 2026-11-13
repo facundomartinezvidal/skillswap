@@ -1,4 +1,6 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
+
+import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,8 +28,8 @@ class ValoresPublicacionTest {
 
     @Test
     void idsNuevosSonDistintosYSeComparanPorValor() {
-        assertNotEquals(PublicacionId.nueva(), PublicacionId.nueva());
-        assertNotEquals(FranjaId.nueva(), FranjaId.nueva());
+        assertNotEquals(PublicacionId.generate(), PublicacionId.generate());
+        assertNotEquals(FranjaId.generate(), FranjaId.generate());
         var uuid = UUID.randomUUID();
         assertEquals(new PublicacionId(uuid), new PublicacionId(uuid));
         assertEquals(new FranjaId(uuid), new FranjaId(uuid));

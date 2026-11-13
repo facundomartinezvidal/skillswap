@@ -1,8 +1,10 @@
-package ar.edu.uade.skillswap.dominio.publicacion;
+package ar.edu.uade.skillswap.domain.publicacion;
+
+import ar.edu.uade.skillswap.domain.shared.DomainException;
 
 import java.util.List;
 
-public class PublicacionIncompletaException extends RuntimeException {
+public class PublicacionIncompletaException extends DomainException {
 
     private final List<String> faltantes;
 
