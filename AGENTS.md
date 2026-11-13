@@ -103,6 +103,7 @@ Si se cambia el contrato, hay que adaptar `MockSkillSwapControllers` y `SkillSwa
 - Preferir `record` para value objects y DTOs inmutables.
 - Al tocar la UI o el mock, la app tiene que seguir ejecutándose con `mvn exec:java`.
 - Cualquier integrante tiene que poder explicar el código en la defensa: preferir soluciones claras antes que ingeniosas.
+- Toda PR que agregue o modifique una entidad o agregado de dominio incluye en su descripción un **diagrama de clases Mermaid** (`classDiagram`) de ese agregado, hecho a partir del código real: atributos, operaciones públicas, entidades internas, value objects, estados y excepciones, con sus relaciones.
 - Las decisiones de diseño van al informe PDF con el formato problema → alternativa elegida → consecuencias → evidencia.
 - Documentación nueva del proyecto: en `docs/`.
 
