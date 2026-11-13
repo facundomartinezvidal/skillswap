@@ -132,6 +132,12 @@ public final class Publicacion {
         if (categoria == null || categoria.isBlank()) {
             faltantes.add("categoría");
         }
+        if (modalidad == null) {
+            faltantes.add("modalidad");
+        }
+        if (duracionEstimada == null || duracionEstimada.isZero() || duracionEstimada.isNegative()) {
+            faltantes.add("duración mayor a 0");
+        }
         if (precioBase == null) {
             faltantes.add("precio");
         }

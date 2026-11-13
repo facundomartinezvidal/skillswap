@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -169,8 +170,8 @@ class PublicacionTest {
 
             var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
 
-            assertEquals(List.of("título", "categoría", "precio", "cupo de al menos 1",
-                    "al menos una franja de disponibilidad"), ex.faltantes());
+            assertEquals(List.of("título", "categoría", "modalidad", "duración mayor a 0", "precio",
+                    "cupo de al menos 1", "al menos una franja de disponibilidad"), ex.faltantes());
             assertEquals("BORRADOR", publicacion.estado().nombre());
             assertTrue(publicacion.historial().isEmpty());
         }
@@ -178,7 +179,7 @@ class PublicacionTest {
         @Test
         void sinFranjasNiTituloFallaYListaAmbos() {
             var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
-            publicacion.editar("  ", null, "Programación", Modalidad.REMOTA, null, 2, new SkillCoins(10), null);
+            publicacion.editar("  ", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 2, new SkillCoins(10), null);
 
             var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
 
@@ -188,11 +189,45 @@ class PublicacionTest {
         @Test
         void sinCategoriaFalla() {
             var publicacion = borradorCompleto(1);
-            publicacion.editar("Mentoría", null, null, Modalidad.REMOTA, null, 1, new SkillCoins(10), null);
+            publicacion.editar("Mentoría", null, null, Modalidad.REMOTA, Duration.ofHours(1), 1, new SkillCoins(10), null);
 
             var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
 
             assertEquals(List.of("categoría"), ex.faltantes());
+        }
+
+        @Test
+        void sinModalidadFalla() {
+            var publicacion = borradorCompleto(1);
+            publicacion.editar("Mentoría", null, "Programación", null, Duration.ofHours(1), 1, new SkillCoins(10), null);
+
+            var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
+
+            assertEquals(List.of("modalidad"), ex.faltantes());
+        }
+
+        @Test
+        void conDuracionCeroNegativaONulaFalla() {
+            for (var duracion : Arrays.asList(Duration.ZERO, Duration.ofMinutes(-30), null)) {
+                var publicacion = borradorCompleto(1);
+                publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, duracion, 1,
+                        new SkillCoins(10), null);
+
+                var ex = assertThrows(PublicacionIncompletaException.class,
+                        () -> publicacion.publicar(AUTOR, AHORA), "duración " + duracion);
+
+                assertEquals(List.of("duración mayor a 0"), ex.faltantes(), "duración " + duracion);
+                assertEquals("BORRADOR", publicacion.estado().nombre());
+            }
+        }
+
+        @Test
+        void unBorradorIncompletoSePuedeCrearYEditarSinModalidadNiDuracion() {
+            var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
+
+            assertDoesNotThrow(() -> publicacion.editar("Mentoría", null, "Programación", null, Duration.ZERO, 1,
+                    new SkillCoins(10), null));
+            assertNull(publicacion.modalidad());
         }
 
         @Test
@@ -213,7 +248,7 @@ class PublicacionTest {
         @Test
         void precioCeroEsValido() {
             var publicacion = borradorCompleto(1);
-            publicacion.editar("Mentoría", null, "Programación", null, null, 1, new SkillCoins(0), null);
+            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1, new SkillCoins(0), null);
 
             assertDoesNotThrow(() -> publicacion.publicar(AUTOR, AHORA));
         }
@@ -398,7 +433,7 @@ class PublicacionTest {
         @Test
         void franjaLlenaFallaYOtraFranjaDeLaMismaPublicacionSigueAceptando() {
             var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
-            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, null, 1, new SkillCoins(10), null);
+            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1, new SkillCoins(10), null);
             var primera = publicacion.agregarFranja(LUNES_10, LUNES_11);
             var segunda = publicacion.agregarFranja(LUNES_11, LUNES_12);
             publicacion.publicar(AUTOR, AHORA);

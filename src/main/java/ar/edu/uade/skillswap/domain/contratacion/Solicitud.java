@@ -8,6 +8,9 @@ import java.util.Objects;
 public record Solicitud(String mensaje, String objetivo, FranjaId franjaElegida) {
 
     public Solicitud {
+        if (objetivo == null || objetivo.isBlank()) {
+            throw new IllegalArgumentException("El objetivo de la solicitud es obligatorio");
+        }
         Objects.requireNonNull(franjaElegida, "La franja elegida es obligatoria");
     }
 }
