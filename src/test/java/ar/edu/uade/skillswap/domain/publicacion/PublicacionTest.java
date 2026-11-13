@@ -3,8 +3,9 @@ package ar.edu.uade.skillswap.domain.publicacion;
 import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
-import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
+import ar.edu.uade.skillswap.domain.shared.CambioEstado;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
+import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

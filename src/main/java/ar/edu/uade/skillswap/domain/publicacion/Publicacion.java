@@ -2,10 +2,11 @@ package ar.edu.uade.skillswap.domain.publicacion;
 
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
-import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.state.Borrador;
 import ar.edu.uade.skillswap.domain.publicacion.state.EstadoPublicacion;
+import ar.edu.uade.skillswap.domain.shared.CambioEstado;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
+import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -113,7 +114,7 @@ public final class Publicacion {
     /** Toma un lugar de la franja (el cupo es por franja). */
     public void reservarCupo(FranjaId franjaId) {
         if (!admiteSolicitudes()) {
-            throw new TransicionInvalidaException(estado.nombre(), "reservar cupo en");
+            throw new TransicionInvalidaException(estado.nombre(), "reservar cupo");
         }
         findFranja(franjaId).reservar(cupo);
     }

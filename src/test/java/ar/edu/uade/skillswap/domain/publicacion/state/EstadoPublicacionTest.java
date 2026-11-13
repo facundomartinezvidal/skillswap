@@ -1,6 +1,6 @@
 package ar.edu.uade.skillswap.domain.publicacion.state;
 
-import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
+import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

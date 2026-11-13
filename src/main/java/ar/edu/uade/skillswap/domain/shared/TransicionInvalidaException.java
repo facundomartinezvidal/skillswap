@@ -1,14 +1,13 @@
-package ar.edu.uade.skillswap.domain.publicacion.exception;
+package ar.edu.uade.skillswap.domain.shared;
 
-import ar.edu.uade.skillswap.domain.shared.DomainException;
-
+/** Acción que el estado actual de una máquina de estados del dominio no permite. */
 public class TransicionInvalidaException extends DomainException {
 
     private final String estado;
     private final String accion;
 
     public TransicionInvalidaException(String estado, String accion) {
-        super("No se puede " + accion + " una publicación en estado " + estado);
+        super("No se puede " + accion + " en estado " + estado);
         this.estado = estado;
         this.accion = accion;
     }
