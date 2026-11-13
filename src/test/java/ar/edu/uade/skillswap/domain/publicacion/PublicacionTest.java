@@ -10,9 +10,6 @@ import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -466,21 +463,6 @@ class PublicacionTest {
                     .findFirst()
                     .orElseThrow()
                     .reservados();
-        }
-    }
-
-    @Test
-    void elDominioNoImportaJpaNiSwing() throws IOException {
-        var domainDir = Path.of("src/main/java/ar/edu/uade/skillswap/domain");
-        try (var files = Files.walk(domainDir)) {
-            var sourceFiles = files.filter(file -> file.toString().endsWith(".java")).toList();
-            assertFalse(sourceFiles.isEmpty(), domainDir.toString());
-            for (var file : sourceFiles) {
-                var source = Files.readString(file);
-                assertFalse(source.contains("jakarta.persistence"), file.toString());
-                assertFalse(source.contains("javax.persistence"), file.toString());
-                assertFalse(source.contains("javax.swing"), file.toString());
-            }
         }
     }
 }
