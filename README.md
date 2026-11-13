@@ -28,10 +28,11 @@ casos de uso nuevos todavía no están conectados a esa UI ni a MySQL.
 
 ## Código inicial
 
-- `src/main/java/ar/edu/uade/skillswap/dominio/`: reglas Java puro para
-  publicaciones y contrataciones.
-- `src/main/java/ar/edu/uade/skillswap/aplicacion/`: casos de uso y puertos de
-  salida independientes de la persistencia.
+- `src/main/java/ar/edu/uade/skillswap/domain/`: reglas Java puro para
+  publicaciones (`domain/publicacion`), contrataciones (`domain/contratacion`) y
+  value objects compartidos (`domain/shared`).
+- Los casos de uso y puertos de salida (`application/`) están pendientes de
+  reconstruirse sobre el nuevo dominio.
 - `src/main/resources/db/migration/`: migraciones Flyway versionadas.
 - `docs/arquitectura.md`: límites y decisiones iniciales.
 - `docs/plan-de-trabajo.md`: pasos sugeridos para completar los cuatro hitos.
