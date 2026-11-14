@@ -93,11 +93,17 @@ Si se cambia el contrato, hay que adaptar `MockSkillSwapControllers` y `SkillSwa
 
 ## Convenciones
 
-- Idioma del dominio y del código: **español** (`Publicacion`, `Contratacion`, `crearBorrador`, `EstadoPublicacion`), igual que el código existente. Hay que mantener ese lenguaje ubicuo.
+- Idioma: **español para el negocio, inglés para lo técnico.**
+  - En español (lenguaje ubicuo de la consigna): entidades, value objects, estados, reglas y operaciones de negocio (`Publicacion`, `Contratacion`, `FranjaDisponibilidad`, `publicar`, `reservarCupo`, `CupoAgotadoException`), nombres de módulo de negocio (`publicacion`, `contratacion`), nombres de tests que describen comportamiento y mensajes que ve el usuario.
+  - En inglés: capas y paquetes técnicos (`domain`, `application`, `infrastructure`, `shared`), sufijos y roles técnicos (`Repository`, `Mapper`, `Exception`, `UseCase`), métodos técnicos (`findById`, `save`, `generate`) y helpers privados sin significado de negocio.
+  - El código entregado por la cátedra (`controllers`, `model`, `ui`, `mock` y sus tipos) no se renombra.
+- Estructura de paquetes: primero la capa, después el módulo de negocio (`domain/publicacion`, `application/publicacion`, `infrastructure/publicacion`). Lo compartido entre módulos va en `domain/shared` (solo value objects y la excepción base). Un módulo referencia a otro solo por ids; la coordinación entre módulos va en `application`.
+- Dentro de cada módulo de dominio: la raíz del agregado, sus entidades internas, los value objects y el puerto del repositorio van en la raíz del módulo. Las implementaciones de patrones y las excepciones van en subpaquetes: `state` (la interfaz sellada y sus estados juntos, porque Java exige el mismo paquete), `strategy` (la interfaz y sus estrategias) y `exception`. Ejemplo: `domain/publicacion/state/EstadoPublicacion.java`.
 - Paquete base: `ar.edu.uade.skillswap`.
 - Preferir `record` para value objects y DTOs inmutables.
 - Al tocar la UI o el mock, la app tiene que seguir ejecutándose con `mvn exec:java`.
 - Cualquier integrante tiene que poder explicar el código en la defensa: preferir soluciones claras antes que ingeniosas.
+- Toda PR que agregue o modifique una entidad o agregado de dominio incluye en su descripción un **diagrama de clases Mermaid** (`classDiagram`) de ese agregado, hecho a partir del código real: atributos, operaciones públicas, entidades internas, value objects, estados y excepciones, con sus relaciones.
 - Las decisiones de diseño van al informe PDF con el formato problema → alternativa elegida → consecuencias → evidencia.
 - Documentación nueva del proyecto: en `docs/`.
 
