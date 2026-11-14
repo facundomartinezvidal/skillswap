@@ -1,6 +1,6 @@
 package ar.edu.uade.skillswap.domain.publicacion.state;
 
-import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
+import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
 /**
  * Patrón State. Cada acción devuelve el estado siguiente o lanza

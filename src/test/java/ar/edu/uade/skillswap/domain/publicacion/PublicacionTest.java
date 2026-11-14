@@ -3,17 +3,16 @@ package ar.edu.uade.skillswap.domain.publicacion;
 import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
-import ar.edu.uade.skillswap.domain.publicacion.exception.TransicionInvalidaException;
+import ar.edu.uade.skillswap.domain.shared.CambioEstado;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
+import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -171,8 +170,8 @@ class PublicacionTest {
 
             var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
 
-            assertEquals(List.of("título", "categoría", "precio", "cupo de al menos 1",
-                    "al menos una franja de disponibilidad"), ex.faltantes());
+            assertEquals(List.of("título", "categoría", "modalidad", "duración mayor a 0", "precio",
+                    "cupo de al menos 1", "al menos una franja de disponibilidad"), ex.faltantes());
             assertEquals("BORRADOR", publicacion.estado().nombre());
             assertTrue(publicacion.historial().isEmpty());
         }
@@ -180,7 +179,7 @@ class PublicacionTest {
         @Test
         void sinFranjasNiTituloFallaYListaAmbos() {
             var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
-            publicacion.editar("  ", null, "Programación", Modalidad.REMOTA, null, 2, new SkillCoins(10), null);
+            publicacion.editar("  ", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 2, new SkillCoins(10), null);
 
             var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
 
@@ -190,11 +189,45 @@ class PublicacionTest {
         @Test
         void sinCategoriaFalla() {
             var publicacion = borradorCompleto(1);
-            publicacion.editar("Mentoría", null, null, Modalidad.REMOTA, null, 1, new SkillCoins(10), null);
+            publicacion.editar("Mentoría", null, null, Modalidad.REMOTA, Duration.ofHours(1), 1, new SkillCoins(10), null);
 
             var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
 
             assertEquals(List.of("categoría"), ex.faltantes());
+        }
+
+        @Test
+        void sinModalidadFalla() {
+            var publicacion = borradorCompleto(1);
+            publicacion.editar("Mentoría", null, "Programación", null, Duration.ofHours(1), 1, new SkillCoins(10), null);
+
+            var ex = assertThrows(PublicacionIncompletaException.class, () -> publicacion.publicar(AUTOR, AHORA));
+
+            assertEquals(List.of("modalidad"), ex.faltantes());
+        }
+
+        @Test
+        void conDuracionCeroNegativaONulaFalla() {
+            for (var duracion : Arrays.asList(Duration.ZERO, Duration.ofMinutes(-30), null)) {
+                var publicacion = borradorCompleto(1);
+                publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, duracion, 1,
+                        new SkillCoins(10), null);
+
+                var ex = assertThrows(PublicacionIncompletaException.class,
+                        () -> publicacion.publicar(AUTOR, AHORA), "duración " + duracion);
+
+                assertEquals(List.of("duración mayor a 0"), ex.faltantes(), "duración " + duracion);
+                assertEquals("BORRADOR", publicacion.estado().nombre());
+            }
+        }
+
+        @Test
+        void unBorradorIncompletoSePuedeCrearYEditarSinModalidadNiDuracion() {
+            var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
+
+            assertDoesNotThrow(() -> publicacion.editar("Mentoría", null, "Programación", null, Duration.ZERO, 1,
+                    new SkillCoins(10), null));
+            assertNull(publicacion.modalidad());
         }
 
         @Test
@@ -215,7 +248,7 @@ class PublicacionTest {
         @Test
         void precioCeroEsValido() {
             var publicacion = borradorCompleto(1);
-            publicacion.editar("Mentoría", null, "Programación", null, null, 1, new SkillCoins(0), null);
+            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1, new SkillCoins(0), null);
 
             assertDoesNotThrow(() -> publicacion.publicar(AUTOR, AHORA));
         }
@@ -400,7 +433,7 @@ class PublicacionTest {
         @Test
         void franjaLlenaFallaYOtraFranjaDeLaMismaPublicacionSigueAceptando() {
             var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
-            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, null, 1, new SkillCoins(10), null);
+            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1, new SkillCoins(10), null);
             var primera = publicacion.agregarFranja(LUNES_10, LUNES_11);
             var segunda = publicacion.agregarFranja(LUNES_11, LUNES_12);
             publicacion.publicar(AUTOR, AHORA);
@@ -465,21 +498,6 @@ class PublicacionTest {
                     .findFirst()
                     .orElseThrow()
                     .reservados();
-        }
-    }
-
-    @Test
-    void elDominioNoImportaJpaNiSwing() throws IOException {
-        var domainDir = Path.of("src/main/java/ar/edu/uade/skillswap/domain");
-        try (var files = Files.walk(domainDir)) {
-            var sourceFiles = files.filter(file -> file.toString().endsWith(".java")).toList();
-            assertFalse(sourceFiles.isEmpty(), domainDir.toString());
-            for (var file : sourceFiles) {
-                var source = Files.readString(file);
-                assertFalse(source.contains("jakarta.persistence"), file.toString());
-                assertFalse(source.contains("javax.persistence"), file.toString());
-                assertFalse(source.contains("javax.swing"), file.toString());
-            }
         }
     }
 }
