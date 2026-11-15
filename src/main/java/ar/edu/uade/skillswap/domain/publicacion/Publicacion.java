@@ -1,5 +1,9 @@
 package ar.edu.uade.skillswap.domain.publicacion;
 
+import ar.edu.uade.skillswap.domain.publicacion.decorator.Precio;
+import ar.edu.uade.skillswap.domain.publicacion.decorator.PrecioBase;
+import ar.edu.uade.skillswap.domain.publicacion.decorator.PrecioConPromocion;
+import ar.edu.uade.skillswap.domain.publicacion.decorator.Promocion;
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
 import ar.edu.uade.skillswap.domain.publicacion.state.Borrador;
@@ -35,6 +39,7 @@ public final class Publicacion {
     private EstadoPublicacion estado = new Borrador();
     private String motivoCancelacion;
     private final List<FranjaDisponibilidad> franjas = new ArrayList<>();
+    private final List<Promocion> promociones = new ArrayList<>();
     private final List<CambioEstado> historial = new ArrayList<>();
 
     private Publicacion(PublicacionId id, String autorId, TipoPublicacion tipo) {
@@ -124,6 +129,37 @@ public final class Publicacion {
         findFranja(franjaId).liberar();
     }
 
+    /** Agrega una promoción al final: se aplica después de las que ya estaban. Se pueden repetir. */
+    public void agregarPromocion(Promocion promocion) {
+        validarQueAdmitePromociones();
+        Objects.requireNonNull(promocion, "La promoción es obligatoria");
+        promociones.add(promocion);
+    }
+
+    /** Quita la primera promoción igual a la indicada; las demás conservan su orden. */
+    public void quitarPromocion(Promocion promocion) {
+        validarQueAdmitePromociones();
+        Objects.requireNonNull(promocion, "La promoción es obligatoria");
+        if (!promociones.remove(promocion)) {
+            throw new IllegalArgumentException("La promoción no está en esta publicación");
+        }
+    }
+
+    /**
+     * Patrón Decorator: envuelve el precio base con una promoción por vez, en el orden
+     * en que se agregaron. Nunca baja de cero porque cada promoción lo garantiza.
+     */
+    public SkillCoins precioFinal() {
+        if (precioBase == null) {
+            throw new IllegalStateException("La publicación todavía no tiene precio base");
+        }
+        Precio precio = new PrecioBase(precioBase);
+        for (var promocion : promociones) {
+            precio = new PrecioConPromocion(precio, promocion);
+        }
+        return precio.valor();
+    }
+
     private List<String> requisitosFaltantesParaPublicar() {
         var faltantes = new ArrayList<String>();
         if (titulo == null || titulo.isBlank()) {
@@ -154,6 +190,12 @@ public final class Publicacion {
         var cambio = new CambioEstado(estado.nombre(), siguiente.nombre(), ahora, actorId, motivo);
         historial.add(cambio);
         estado = siguiente;
+    }
+
+    private void validarQueAdmitePromociones() {
+        if (!estado.admitePromociones()) {
+            throw new TransicionInvalidaException(estado.nombre(), "modificar promociones");
+        }
     }
 
     private FranjaDisponibilidad findFranja(FranjaId franjaId) {
@@ -217,6 +259,10 @@ public final class Publicacion {
 
     public List<FranjaDisponibilidad> franjas() {
         return List.copyOf(franjas);
+    }
+
+    public List<Promocion> promociones() {
+        return List.copyOf(promociones);
     }
 
     public List<CambioEstado> historial() {

@@ -21,4 +21,9 @@ public record Borrador() implements EstadoPublicacion {
     public void editar() {
         // En borrador se puede editar libremente.
     }
+
+    @Override
+    public boolean admitePromociones() {
+        return true;
+    }
 }
