@@ -1,5 +1,12 @@
 package ar.edu.uade.skillswap.domain.contratacion;
 
+import ar.edu.uade.skillswap.domain.contratacion.evento.ContratacionAceptada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.ContratacionCancelada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.PagoConfirmado;
+import ar.edu.uade.skillswap.domain.contratacion.evento.ReprogramacionAceptada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.ReprogramacionPropuesta;
+import ar.edu.uade.skillswap.domain.contratacion.evento.SesionCompletada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.SolicitudRecibida;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AccionNoPermitidaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AutoSolicitudException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.ReprogramacionInvalidaException;
@@ -10,6 +17,7 @@ import ar.edu.uade.skillswap.domain.contratacion.strategy.PoliticaReintegro;
 import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.shared.CambioEstado;
+import ar.edu.uade.skillswap.domain.shared.EventoDominio;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
@@ -21,7 +29,9 @@ import java.util.Objects;
 /**
  * Raíz del agregado Contratacion. Valida el rol del actor, delega las transiciones en su
  * {@link EstadoContratacion} y registra cada cambio válido en un historial que solo crece.
- * Una operación rechazada no modifica nada.
+ * Las operaciones válidas que interesan a otra parte registran además un {@link EventoDominio},
+ * que el caso de uso extrae con {@link #extraerEventos()} después de guardar.
+ * Una operación rechazada no modifica nada, tampoco los eventos pendientes.
  */
 public final class Contratacion {
 
@@ -37,6 +47,7 @@ public final class Contratacion {
     private PropuestaReprogramacion propuesta;
     private Reintegro reintegro;
     private final List<CambioEstado> historial = new ArrayList<>();
+    private final List<EventoDominio> eventos = new ArrayList<>();
 
     private Contratacion(ContratacionId id, PublicacionId publicacionId, String clienteId, String proveedorId,
                          Solicitud solicitud, Instant inicioSesion, SkillCoins precioAcordado) {
@@ -64,13 +75,16 @@ public final class Contratacion {
         if (clienteId.equals(proveedorId)) {
             throw new AutoSolicitudException(clienteId);
         }
-        return new Contratacion(ContratacionId.generate(), publicacionId, clienteId, proveedorId,
+        var contratacion = new Contratacion(ContratacionId.generate(), publicacionId, clienteId, proveedorId,
                 solicitud, inicioSesion, precio);
+        contratacion.eventos.add(new SolicitudRecibida(contratacion.id, clienteId, proveedorId, ahora));
+        return contratacion;
     }
 
     public void aceptar(String actorId, Instant ahora) {
         requireProveedor(actorId, "aceptar");
         transitionTo(estado.aceptar(), actorId, null, ahora);
+        eventos.add(new ContratacionAceptada(id, clienteId, proveedorId, ahora));
     }
 
     public void rechazar(String actorId, String motivo, Instant ahora) {
@@ -82,6 +96,7 @@ public final class Contratacion {
     public void pagar(String actorId, Instant ahora) {
         requireCliente(actorId, "pagar");
         transitionTo(estado.pagar(), actorId, null, ahora);
+        eventos.add(new PagoConfirmado(id, clienteId, proveedorId, ahora));
     }
 
     public void iniciar(String actorId, Instant ahora) {
@@ -92,6 +107,7 @@ public final class Contratacion {
     public void completar(String actorId, Instant ahora) {
         requireProveedor(actorId, "completar");
         transitionTo(estado.completar(), actorId, null, ahora);
+        eventos.add(new SesionCompletada(id, clienteId, proveedorId, ahora));
     }
 
     /**
@@ -112,6 +128,7 @@ public final class Contratacion {
                 : Reintegro.cero();
         transitionTo(siguiente, actorId, motivo, ahora);
         this.reintegro = calculado;
+        eventos.add(new ContratacionCancelada(id, actorId, contraparteDe(actorId), motivo, ahora));
         return calculado;
     }
 
@@ -127,7 +144,9 @@ public final class Contratacion {
         if (nuevaFranja.equals(franjaId)) {
             throw new ReprogramacionInvalidaException("La franja propuesta es la misma que la actual");
         }
-        this.propuesta = new PropuestaReprogramacion(actorId, nuevaFranja, nuevoInicio);
+        var nueva = new PropuestaReprogramacion(actorId, nuevaFranja, nuevoInicio);
+        this.propuesta = nueva;
+        eventos.add(new ReprogramacionPropuesta(id, actorId, contraparteDe(actorId), nueva.inicio(), ahora));
     }
 
     /** Aplica la propuesta y devuelve la franja anterior, para que el caso de uso libere su cupo. */
@@ -136,9 +155,11 @@ public final class Contratacion {
         requireAdmiteReprogramacion("aceptar una reprogramación");
         requireAntesDelInicio(ahora);
         var anterior = franjaId;
-        this.franjaId = propuesta.franjaId();
-        this.inicioSesion = propuesta.inicio();
+        var aceptada = propuesta;
+        this.franjaId = aceptada.franjaId();
+        this.inicioSesion = aceptada.inicio();
         this.propuesta = null;
+        eventos.add(new ReprogramacionAceptada(id, aceptada.propuestaPor(), actorId, aceptada.inicio(), ahora));
         return anterior;
     }
 
@@ -149,6 +170,20 @@ public final class Contratacion {
 
     public boolean esParticipante(String userId) {
         return clienteId.equals(userId) || proveedorId.equals(userId);
+    }
+
+    /**
+     * Devuelve los eventos registrados desde la última extracción, en orden, y vacía la lista.
+     * El caso de uso lo llama una vez, después de guardar la contratación.
+     */
+    public List<EventoDominio> extraerEventos() {
+        var pendientes = List.copyOf(eventos);
+        eventos.clear();
+        return pendientes;
+    }
+
+    private String contraparteDe(String participanteId) {
+        return clienteId.equals(participanteId) ? proveedorId : clienteId;
     }
 
     private void transitionTo(EstadoContratacion siguiente, String actorId, String motivo, Instant ahora) {
