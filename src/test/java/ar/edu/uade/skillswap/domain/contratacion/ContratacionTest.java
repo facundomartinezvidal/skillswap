@@ -9,6 +9,7 @@ import ar.edu.uade.skillswap.domain.contratacion.evento.SesionCompletada;
 import ar.edu.uade.skillswap.domain.contratacion.evento.SolicitudRecibida;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AccionNoPermitidaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AutoSolicitudException;
+import ar.edu.uade.skillswap.domain.contratacion.exception.CalificacionDuplicadaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.ReprogramacionInvalidaException;
 import ar.edu.uade.skillswap.domain.contratacion.strategy.PoliticaReintegro;
 import ar.edu.uade.skillswap.domain.contratacion.strategy.PoliticaReintegroFactory;
@@ -18,6 +19,7 @@ import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.shared.CambioEstado;
 import ar.edu.uade.skillswap.domain.shared.EventoDominio;
+import ar.edu.uade.skillswap.domain.shared.Puntaje;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
@@ -598,6 +600,120 @@ class ContratacionTest {
             contratacion.aceptarReprogramacion(PROVEEDOR, AHORA);
 
             assertSinCambios(contratacion, "ACEPTADA", historial);
+        }
+    }
+
+    @Nested
+    class Calificar {
+
+        private static final Instant DESPUES = INICIO.plusSeconds(7200);
+
+        @Test
+        void clienteYProveedorCalificanYCadaCalificacionVaALaOtraParte() {
+            var contratacion = completada();
+
+            var delCliente = contratacion.calificar(CLIENTE, new Puntaje(5), "Excelente sesión", DESPUES);
+            var delProveedor = contratacion.calificar(PROVEEDOR, new Puntaje(4), null, DESPUES);
+
+            assertEquals(CLIENTE, delCliente.autorId());
+            assertEquals(PROVEEDOR, delCliente.destinatarioId());
+            assertEquals(new Puntaje(5), delCliente.puntaje());
+            assertEquals("Excelente sesión", delCliente.comentario());
+            assertEquals(DESPUES, delCliente.fecha());
+            assertEquals(PROVEEDOR, delProveedor.autorId());
+            assertEquals(CLIENTE, delProveedor.destinatarioId());
+            assertNull(delProveedor.comentario());
+            assertNotEquals(delCliente.id(), delProveedor.id());
+            assertEquals(List.of(delCliente, delProveedor), contratacion.calificaciones());
+        }
+
+        @Test
+        void unTerceroNoPuedeCalificarYNoSeAgregaNada() {
+            var contratacion = completada();
+
+            var ex = assertThrows(AccionNoPermitidaException.class,
+                    () -> contratacion.calificar(AJENO, new Puntaje(1), "spam", DESPUES));
+
+            assertEquals(AJENO, ex.actorId());
+            assertEquals(List.of(), contratacion.calificaciones());
+        }
+
+        @Test
+        void soloSePuedeCalificarUnaContratacionCompletada() {
+            Map<String, Supplier<Contratacion>> noCompletadas = new LinkedHashMap<>();
+            noCompletadas.put("PENDIENTE", ContratacionTest::pendiente);
+            noCompletadas.put("ACEPTADA", ContratacionTest::aceptada);
+            noCompletadas.put("CONFIRMADA", ContratacionTest::confirmada);
+            noCompletadas.put("EN_CURSO", ContratacionTest::enCurso);
+            noCompletadas.put("RECHAZADA", ContratacionTest::rechazada);
+            noCompletadas.put("CANCELADA", ContratacionTest::cancelada);
+
+            noCompletadas.forEach((estado, crear) -> {
+                for (var autor : List.of(CLIENTE, PROVEEDOR)) {
+                    var contratacion = crear.get();
+                    var historial = contratacion.historial();
+
+                    var ex = assertThrows(TransicionInvalidaException.class,
+                            () -> contratacion.calificar(autor, new Puntaje(3), null, DESPUES), estado);
+
+                    assertEquals(estado, ex.estado());
+                    assertEquals("calificar", ex.accion());
+                    assertEquals(List.of(), contratacion.calificaciones(), estado);
+                    assertSinCambios(contratacion, estado, historial);
+                }
+            });
+        }
+
+        @Test
+        void unParticipanteNoPuedeCalificarDosVeces() {
+            var contratacion = completada();
+            var primera = contratacion.calificar(CLIENTE, new Puntaje(5), null, DESPUES);
+
+            var ex = assertThrows(CalificacionDuplicadaException.class,
+                    () -> contratacion.calificar(CLIENTE, new Puntaje(1), "me arrepentí", DESPUES));
+
+            assertEquals(CLIENTE, ex.autorId());
+            assertEquals(List.of(primera), contratacion.calificaciones());
+        }
+
+        @Test
+        void calificarNoCambiaElEstadoNiElHistorial() {
+            var contratacion = completada();
+            var historial = contratacion.historial();
+
+            contratacion.calificar(CLIENTE, new Puntaje(5), null, DESPUES);
+            contratacion.calificar(PROVEEDOR, new Puntaje(5), null, DESPUES);
+
+            assertSinCambios(contratacion, "COMPLETADA", historial);
+        }
+
+        @Test
+        void elComentarioEsOpcionalPeroPuntajeYFechaSonObligatorios() {
+            var contratacion = completada();
+
+            assertThrows(NullPointerException.class, () -> contratacion.calificar(CLIENTE, null, null, DESPUES));
+            assertThrows(NullPointerException.class,
+                    () -> contratacion.calificar(CLIENTE, new Puntaje(5), null, null));
+            assertEquals(List.of(), contratacion.calificaciones());
+
+            var calificacion = contratacion.calificar(CLIENTE, new Puntaje(5), "", DESPUES);
+            assertEquals("", calificacion.comentario());
+        }
+
+        @Test
+        void lasCalificacionesDevueltasNoSePuedenModificar() {
+            var contratacion = completada();
+            contratacion.calificar(CLIENTE, new Puntaje(5), null, DESPUES);
+            var calificaciones = contratacion.calificaciones();
+
+            assertThrows(UnsupportedOperationException.class, calificaciones::clear);
+            assertEquals(1, contratacion.calificaciones().size());
+        }
+
+        @Test
+        void unaCalificacionNoPuedeTenerAlMismoUsuarioComoAutorYDestinatario() {
+            assertThrows(IllegalArgumentException.class, () -> new Calificacion(CalificacionId.generate(),
+                    CLIENTE, CLIENTE, new Puntaje(5), null, DESPUES));
         }
     }
 

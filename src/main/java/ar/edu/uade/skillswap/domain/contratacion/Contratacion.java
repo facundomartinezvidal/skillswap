@@ -9,6 +9,7 @@ import ar.edu.uade.skillswap.domain.contratacion.evento.SesionCompletada;
 import ar.edu.uade.skillswap.domain.contratacion.evento.SolicitudRecibida;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AccionNoPermitidaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AutoSolicitudException;
+import ar.edu.uade.skillswap.domain.contratacion.exception.CalificacionDuplicadaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.ReprogramacionInvalidaException;
 import ar.edu.uade.skillswap.domain.contratacion.state.Confirmada;
 import ar.edu.uade.skillswap.domain.contratacion.state.EstadoContratacion;
@@ -18,6 +19,7 @@ import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.shared.CambioEstado;
 import ar.edu.uade.skillswap.domain.shared.EventoDominio;
+import ar.edu.uade.skillswap.domain.shared.Puntaje;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 
@@ -47,6 +49,7 @@ public final class Contratacion {
     private PropuestaReprogramacion propuesta;
     private Reintegro reintegro;
     private final List<CambioEstado> historial = new ArrayList<>();
+    private final List<Calificacion> calificaciones = new ArrayList<>();
     private final List<EventoDominio> eventos = new ArrayList<>();
 
     private Contratacion(ContratacionId id, PublicacionId publicacionId, String clienteId, String proveedorId,
@@ -168,6 +171,26 @@ public final class Contratacion {
         this.propuesta = null;
     }
 
+    /**
+     * Califica a la otra parte. Solo en COMPLETADA y una vez por participante; el destinatario se
+     * deduce, así que nadie puede calificarse a sí mismo. No cambia el estado ni el historial: el caso
+     * de uso registra el puntaje en el perfil del destinatario.
+     */
+    public Calificacion calificar(String autorId, Puntaje puntaje, String comentario, Instant ahora) {
+        requireParticipante(autorId, "calificar");
+        if (!estado.admiteCalificacion()) {
+            throw new TransicionInvalidaException(estado.nombre(), "calificar");
+        }
+        if (calificaciones.stream().anyMatch(c -> c.autorId().equals(autorId))) {
+            throw new CalificacionDuplicadaException(autorId);
+        }
+        var destinatarioId = clienteId.equals(autorId) ? proveedorId : clienteId;
+        var calificacion = new Calificacion(CalificacionId.generate(), autorId, destinatarioId, puntaje,
+                comentario, ahora);
+        calificaciones.add(calificacion);
+        return calificacion;
+    }
+
     public boolean esParticipante(String userId) {
         return clienteId.equals(userId) || proveedorId.equals(userId);
     }
@@ -287,5 +310,9 @@ public final class Contratacion {
 
     public List<CambioEstado> historial() {
         return List.copyOf(historial);
+    }
+
+    public List<Calificacion> calificaciones() {
+        return List.copyOf(calificaciones);
     }
 }

@@ -1,5 +1,8 @@
 package ar.edu.uade.skillswap.domain.publicacion;
 
+import ar.edu.uade.skillswap.domain.publicacion.decorator.DescuentoFijo;
+import ar.edu.uade.skillswap.domain.publicacion.decorator.DescuentoPorcentual;
+import ar.edu.uade.skillswap.domain.publicacion.decorator.Promocion;
 import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
@@ -498,6 +501,200 @@ class PublicacionTest {
                     .findFirst()
                     .orElseThrow()
                     .reservados();
+        }
+    }
+
+    @Nested
+    class Promociones {
+
+        private final Promocion diezPorCiento = new DescuentoPorcentual(10);
+        private final Promocion menos20 = new DescuentoFijo(new SkillCoins(20));
+
+        @Test
+        void sinPromocionesElPrecioFinalEsElBase() {
+            var publicacion = borradorCompleto(1);
+
+            assertEquals(new SkillCoins(100), publicacion.precioFinal());
+            assertTrue(publicacion.promociones().isEmpty());
+        }
+
+        @Test
+        void diezPorCientoSobre100Da90() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(diezPorCiento);
+
+            assertEquals(new SkillCoins(90), publicacion.precioFinal());
+        }
+
+        @Test
+        void seAplicanEnElOrdenEnQueSeAgregaron() {
+            var porcentualPrimero = borradorCompleto(1);
+            porcentualPrimero.agregarPromocion(diezPorCiento);
+            porcentualPrimero.agregarPromocion(menos20);
+
+            var fijoPrimero = borradorCompleto(1);
+            fijoPrimero.agregarPromocion(menos20);
+            fijoPrimero.agregarPromocion(diezPorCiento);
+
+            assertEquals(new SkillCoins(70), porcentualPrimero.precioFinal());
+            assertEquals(new SkillCoins(72), fijoPrimero.precioFinal());
+            assertEquals(List.of(diezPorCiento, menos20), porcentualPrimero.promociones());
+        }
+
+        @Test
+        void promocionesAcumuladasQueSuperanElPrecioDejanCeroSinExcepcion() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(new DescuentoFijo(new SkillCoins(80)));
+            publicacion.agregarPromocion(new DescuentoFijo(new SkillCoins(50)));
+
+            assertEquals(new SkillCoins(0), assertDoesNotThrow(publicacion::precioFinal));
+        }
+
+        @Test
+        void cienPorCientoDejaElPrecioEnCero() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(new DescuentoPorcentual(100));
+
+            assertEquals(new SkillCoins(0), publicacion.precioFinal());
+        }
+
+        @Test
+        void elDescuentoPorcentualSeRedondeaHaciaAbajo() {
+            var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
+            publicacion.editar("Mentoría", null, "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1,
+                    new SkillCoins(99), null);
+            publicacion.agregarPromocion(new DescuentoPorcentual(50));
+
+            assertEquals(new SkillCoins(50), publicacion.precioFinal());
+        }
+
+        @Test
+        void elPrecioBaseNoCambiaAlAgregarPromociones() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(diezPorCiento);
+            publicacion.agregarPromocion(menos20);
+
+            assertEquals(new SkillCoins(100), publicacion.precioBase());
+        }
+
+        @Test
+        void sePuedenRepetirPromocionesIguales() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(menos20);
+            publicacion.agregarPromocion(menos20);
+
+            assertEquals(2, publicacion.promociones().size());
+            assertEquals(new SkillCoins(60), publicacion.precioFinal());
+        }
+
+        @Test
+        void quitarUnaPromocionLaSacaDelCalculo() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(diezPorCiento);
+            publicacion.agregarPromocion(menos20);
+
+            publicacion.quitarPromocion(diezPorCiento);
+
+            assertEquals(List.of(menos20), publicacion.promociones());
+            assertEquals(new SkillCoins(80), publicacion.precioFinal());
+        }
+
+        @Test
+        void quitarUnaRepetidaQuitaSoloLaPrimera() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(menos20);
+            publicacion.agregarPromocion(diezPorCiento);
+            publicacion.agregarPromocion(menos20);
+
+            publicacion.quitarPromocion(menos20);
+
+            assertEquals(List.of(diezPorCiento, menos20), publicacion.promociones());
+        }
+
+        @Test
+        void quitarUnaPromocionQueNoEstaFallaSinCambios() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(diezPorCiento);
+
+            assertThrows(IllegalArgumentException.class, () -> publicacion.quitarPromocion(menos20));
+            assertEquals(List.of(diezPorCiento), publicacion.promociones());
+        }
+
+        @Test
+        void rechazaPromocionNula() {
+            var publicacion = borradorCompleto(1);
+
+            assertThrows(NullPointerException.class, () -> publicacion.agregarPromocion(null));
+            assertThrows(NullPointerException.class, () -> publicacion.quitarPromocion(null));
+            assertTrue(publicacion.promociones().isEmpty());
+        }
+
+        @Test
+        void enBorradorPublicadaYPausadaSePuedenAgregarYQuitar() {
+            for (var publicacion : List.of(borradorCompleto(1), publicada(), pausada())) {
+                var estado = publicacion.estado().nombre();
+
+                assertDoesNotThrow(() -> publicacion.agregarPromocion(diezPorCiento), estado);
+                assertEquals(new SkillCoins(90), publicacion.precioFinal(), estado);
+                assertDoesNotThrow(() -> publicacion.quitarPromocion(diezPorCiento), estado);
+                assertTrue(publicacion.promociones().isEmpty(), estado);
+            }
+        }
+
+        @Test
+        void enCerradaOCanceladaAgregarYQuitarLanzanTransicionInvalidaSinCambios() {
+            var cierres = List.<Consumer<Publicacion>>of(
+                    p -> p.cerrar(AUTOR, null, AHORA),
+                    p -> p.cancelar(AUTOR, "ya no la dicto", AHORA));
+            for (var cierre : cierres) {
+                var publicacion = conPromocionY(diezPorCiento, cierre);
+                var estado = publicacion.estado().nombre();
+
+                var alAgregar = assertThrows(TransicionInvalidaException.class,
+                        () -> publicacion.agregarPromocion(menos20), estado);
+                var alQuitar = assertThrows(TransicionInvalidaException.class,
+                        () -> publicacion.quitarPromocion(diezPorCiento), estado);
+
+                assertEquals("modificar promociones", alAgregar.accion());
+                assertEquals(estado, alQuitar.estado());
+                assertEquals(List.of(diezPorCiento), publicacion.promociones(), estado);
+            }
+        }
+
+        @Test
+        void lasPromocionesNoCambianElEstadoNiElHistorial() {
+            var publicacion = publicada();
+            var historial = publicacion.historial();
+
+            publicacion.agregarPromocion(diezPorCiento);
+            publicacion.quitarPromocion(diezPorCiento);
+
+            assertEquals("PUBLICADA", publicacion.estado().nombre());
+            assertEquals(historial, publicacion.historial());
+        }
+
+        @Test
+        void lasPromocionesDevueltasNoSePuedenModificar() {
+            var publicacion = borradorCompleto(1);
+            publicacion.agregarPromocion(diezPorCiento);
+
+            assertThrows(UnsupportedOperationException.class, () -> publicacion.promociones().clear());
+            assertEquals(1, publicacion.promociones().size());
+        }
+
+        @Test
+        void precioFinalSinPrecioBaseFallaConMensajeClaro() {
+            var publicacion = Publicacion.crearBorrador(AUTOR, TipoPublicacion.OFERTA);
+
+            var ex = assertThrows(IllegalStateException.class, publicacion::precioFinal);
+            assertTrue(ex.getMessage().contains("precio base"));
+        }
+
+        private Publicacion conPromocionY(Promocion promocion, Consumer<Publicacion> terminar) {
+            var publicacion = publicada();
+            publicacion.agregarPromocion(promocion);
+            terminar.accept(publicacion);
+            return publicacion;
         }
     }
 }
