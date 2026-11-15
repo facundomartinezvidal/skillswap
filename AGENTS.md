@@ -62,18 +62,52 @@ mvn exec:java -Dexec.args="--screenshot out.png"
 ```
 src/main/java/ar/edu/uade/skillswap/
 ├── SkillSwapApplication.java          # main: instala Theme, crea MockSkillSwapControllers y abre la ventana
+├── domain/                            # Dominio Java puro (completo, ver abajo)
+│   ├── publicacion/                   # Publicacion, franjas, cupo; state/, decorator/ (promociones), exception/
+│   ├── contratacion/                  # Contratacion, Solicitud, Reintegro, Calificacion; state/, strategy/, evento/, exception/
+│   ├── wallet/                        # Wallet, Movimiento, RetencionDePagos; exception/
+│   ├── perfil/                        # Perfil, Reputacion, DisponibilidadSemanal, TipoPerfil, CanalNotificacion; exception/
+│   ├── notificacion/                  # Notificacion (bandeja); exception/
+│   └── shared/                        # SkillCoins, Puntaje, CambioEstado, EventoDominio, DomainException, TransicionInvalidaException
 ├── controllers/UiControllers.java     # CONTRATO entre la UI y el backend (interfaces de controllers)
 ├── mock/MockSkillSwapControllers.java # implementación en memoria con datos de demo
 ├── model/Models.java                  # records/enums que viajan entre la UI y los controllers
 └── ui/                                # SkillSwapView (pantallas) y Theme (colores y fuentes)
-src/test/java/ar/edu/uade/skillswap/mock/MockSkillSwapControllersTest.java
+src/main/resources/db/migration/V1__esquema_inicial.sql   # esquema inicial (todavía no alineado con el dominio)
+src/test/java/ar/edu/uade/skillswap/
+├── ArquitecturaTest.java              # regla de dependencias del dominio
+├── domain/                            # un test por agregado, value objects, estados, estrategias, decorator y eventos
+└── mock/MockSkillSwapControllersTest.java
 ```
 
 - `UiControllers` agrupa las sub-interfaces `BusquedaController`, `PublicacionController`, `ContratacionController`, `WalletController`, `NotificacionController` y `PerfilController`.
 - `Models` son **modelos de vista** (records inmutables): `Perfil`, `Publicacion`, `Contratacion`, `Movimiento`, `Notificacion`, `FiltrosBusqueda` y los enums `Modalidad`, `EstadoPublicacion` y `EstadoContratacion`. **No** son entidades de dominio ni entidades JPA, y no deben tener lógica de negocio.
 - `Modalidad` tiene `HIBRIDA` además de `REMOTA` y `PRESENCIAL`, aunque la consigna solo menciona remota y presencial.
-- Todavía **no existen** el dominio, los casos de uso, la persistencia, `persistence.xml` ni las migraciones.
 - El usuario activo está hardcodeado en la UI (`USER_ID = "user-mateo"`), simulando el login mock.
+- **El dominio está completo; todavía no existen** la capa `application/` (casos de uso), `infrastructure/` (JPA, adapters), `persistence.xml` ni la conexión de la UI con el backend real. La UI sigue usando el mock.
+- `mvn test` corre 345 tests. El detalle de cada agregado está en [`docs/arquitectura.md`](docs/arquitectura.md).
+
+### Decisiones de dominio acordadas
+
+Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y cubiertas por tests.
+
+- **El modelo parte del dominio.** El esquema Flyway (`V1`) se ajusta al dominio en el hito de persistencia, no al revés.
+- **Identidad de las personas:** todo el dominio usa el `userId` del servicio de identidad mock (`autorId`, `clienteId`, `proveedorId`, `titularId`, `Perfil.userId`). No hay `PerfilId`.
+- **Módulos solo por id:** ningún módulo de dominio importa a otro salvo sus ids (`PublicacionId`, `FranjaId`, `ContratacionId`). `notificacion` solo depende de `shared`.
+- **Publicacion:** cupo **por franja** (`reservarCupo`/`liberarCupo`); `PAUSADA → PUBLICADA` (reanudar) permitido como interpretación del equipo. Las promociones las define el autor en su publicación, se acumulan en el orden en que se agregaron, se pueden cambiar en `BORRADOR`, `PUBLICADA` y `PAUSADA`, y `precioFinal()` nunca baja de 0.
+- **Contratacion:** valida el rol del actor (el proveedor acepta, rechaza, inicia y completa; el cliente paga). La reprogramación no cambia el estado: una parte propone y la otra acepta o rechaza. El reintegro al cancelar lo calcula una `PoliticaReintegro` (100/50/0 % según anticipación de 48 h y 24 h, configurable; todo al cliente si cancela el proveedor).
+- **Calificación:** es una acción de `Contratacion` en `COMPLETADA`, una por participante, dirigida siempre a la otra parte. La reputación se acumula en `Perfil` (`Reputacion`: suma y cantidad) y solo cambia con `registrarCalificacion`.
+- **Wallet:** el pago queda **retenido** en una Wallet de garantía de la plataforma (`Wallet.TITULAR_GARANTIA`) hasta completar; al cancelar, la garantía reparte según el `Reintegro`. `RetencionDePagos` agrupa cada débito con su crédito. Saldo inicial: bono de bienvenida que pasa `main`, más `acreditarDemo`. La Wallet guarda solo los movimientos nuevos; el listado lo hará el repositorio.
+- **Perfil:** `TipoPerfil` (`PROFESIONAL` u `ORGANIZACION`) fijo desde la creación; la baja lógica queda en el historial y un perfil dado de baja rechaza ediciones pero sigue recibiendo calificaciones.
+- **Eventos y notificaciones:** `Contratacion` registra un `EventoDominio` por cada operación válida (solicitud, aceptación, pago, reprogramación propuesta y aceptada, cancelación, sesión completada); cada evento declara sus interesados. El caso de uso los toma con `extraerEventos()` después de guardar. `Notificacion` es genérica y solo su destinatario la marca como leída; el canal no es parte de la notificación.
+- **Patrones implementados:** State (estados de publicación y contratación), Strategy + Simple Factory (políticas de reintegro), Decorator (promociones sobre el precio). Observer tiene listo el dominio (eventos); faltan el publicador y los suscriptores. Adapter queda para infraestructura.
+
+### Próximo hito: capa de aplicación
+
+- Casos de uso que coordinan agregados en una transacción: pagar (`Contratacion.pagar` + `RetencionDePagos.retener`), completar (`completar` + `liberarAlProveedor`), cancelar (`cancelar` + `repartir`), calificar (`calificar` + `Perfil.registrarCalificacion`), solicitar con `publicacion.precioFinal()` y reserva de cupo, y publicar validando que el `TipoPerfil` coincida con el `TipoPublicacion`.
+- Publicador de eventos y suscriptores (Observer), elección del canal según el perfil (Simple Factory) y adapters mock de email y push (Adapter), para cubrir el caso de aceptación 8.
+- Implementaciones en memoria de los repositorios para testear los casos de uso.
+- Pendientes de persistencia: alinear `V1` con el dominio (identidad por `userId`, Wallet de garantía sin perfil, tipo de perfil), reconstruir los agregados desde la base y bloqueo optimista sobre la fila de la garantía.
 
 ### Qué le falta al contrato actual respecto de la consigna
 
@@ -98,7 +132,7 @@ Si se cambia el contrato, hay que adaptar `MockSkillSwapControllers` y `SkillSwa
   - En inglés: capas y paquetes técnicos (`domain`, `application`, `infrastructure`, `shared`), sufijos y roles técnicos (`Repository`, `Mapper`, `Exception`, `UseCase`), métodos técnicos (`findById`, `save`, `generate`) y helpers privados sin significado de negocio.
   - El código entregado por la cátedra (`controllers`, `model`, `ui`, `mock` y sus tipos) no se renombra.
 - Estructura de paquetes: primero la capa, después el módulo de negocio (`domain/publicacion`, `application/publicacion`, `infrastructure/publicacion`). Lo compartido entre módulos va en `domain/shared` (solo value objects y la excepción base). Un módulo referencia a otro solo por ids; la coordinación entre módulos va en `application`.
-- Dentro de cada módulo de dominio: la raíz del agregado, sus entidades internas, los value objects y el puerto del repositorio van en la raíz del módulo. Las implementaciones de patrones y las excepciones van en subpaquetes: `state` (la interfaz sellada y sus estados juntos, porque Java exige el mismo paquete), `strategy` (la interfaz y sus estrategias) y `exception`. Ejemplo: `domain/publicacion/state/EstadoPublicacion.java`.
+- Dentro de cada módulo de dominio: la raíz del agregado, sus entidades internas, los value objects y el puerto del repositorio van en la raíz del módulo. Las implementaciones de patrones y las excepciones van en subpaquetes: `state` (la interfaz sellada y sus estados juntos, porque Java exige el mismo paquete), `strategy` (la interfaz y sus estrategias), `decorator` (el componente, el decorador y lo que decora), `evento` (los eventos de dominio que emite el agregado) y `exception`. Ejemplo: `domain/publicacion/state/EstadoPublicacion.java`.
 - Paquete base: `ar.edu.uade.skillswap`.
 - Preferir `record` para value objects y DTOs inmutables.
 - Al tocar la UI o el mock, la app tiene que seguir ejecutándose con `mvn exec:java`.
