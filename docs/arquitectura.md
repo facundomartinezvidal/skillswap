@@ -11,13 +11,15 @@ ar.edu.uade.skillswap
 │   ├── publicacion/         # Agregado Publicacion, franjas e ids
 │   │   ├── state/           # Patrón State: EstadoPublicacion y sus estados
 │   │   └── exception/
-│   ├── contratacion/        # Agregado Contratacion, solicitud, reintegro y reprogramación
+│   ├── contratacion/        # Agregado Contratacion, solicitud, reintegro, reprogramación y calificaciones
 │   │   ├── state/           # Patrón State: EstadoContratacion y sus estados
 │   │   ├── strategy/        # Patrón Strategy: políticas de reintegro y su factory
 │   │   └── exception/
+│   ├── perfil/              # Agregado Perfil, reputación, disponibilidad semanal y su repositorio
+│   │   └── exception/
 │   ├── wallet/              # Agregado Wallet, movimientos, retención de pagos y su repositorio
 │   │   └── exception/
-│   └── shared/              # SkillCoins, CambioEstado y excepciones base
+│   └── shared/              # SkillCoins, Puntaje, CambioEstado y excepciones base
 ├── application/             # Pendiente: casos de uso y puertos sobre el nuevo dominio
 ├── infrastructure/          # Próximo hito: JPA, Flyway y adaptadores externos
 ├── controllers/             # Contrato actual de la UI Swing
@@ -39,7 +41,7 @@ flowchart LR
 La infraestructura es un detalle: la capa de dominio no importa JPA, Hibernate,
 Swing, MySQL ni clases de `controllers`, `ui`, `mock` o `model`; `ArquitecturaTest`
 lo verifica en cada build. Los módulos de dominio se referencian entre sí solo
-por id (`PublicacionId`, `FranjaId`); la coordinación entre módulos corresponde a
+por id (`PublicacionId`, `FranjaId` o el `userId` de las personas); la coordinación entre módulos corresponde a
 la capa de aplicación. La configuración manual de objetos se agregará en
 el punto de composición cuando se conecte la implementación persistente.
 
@@ -72,6 +74,32 @@ el punto de composición cuando se conecte la implementación persistente.
   `ACEPTADA` o `CONFIRMADA`, antes del inicio, y el otro la acepta o la rechaza.
   Al aceptarla, la contratación devuelve la franja anterior para que se libere su
   cupo.
+- Calificar es una acción de la `Contratacion`, no un agregado aparte: solo el
+  estado `COMPLETADA` la admite (`admiteCalificacion()` del State), solo los
+  participantes califican (un tercero recibe `AccionNoPermitidaException`) y
+  cada uno lo hace una vez (`CalificacionDuplicadaException`). El destinatario se
+  deduce como la otra parte, así que nadie puede calificarse a sí mismo. El
+  puntaje (`Puntaje`, en `domain/shared`) va de 1 a 5 y el comentario es
+  opcional. Calificar no cambia el estado ni agrega un cambio al historial.
+- `Perfil` se identifica por el `userId` del servicio de identidad (un usuario
+  tiene un solo perfil) y tiene un `TipoPerfil` fijo desde la creación:
+  `PROFESIONAL` (publica ofertas) u `ORGANIZACION` (publica desafíos). Guarda
+  nombre visible, biografía, zona horaria, habilidades, intereses, disponibilidad
+  semanal (`DisponibilidadSemanal`: día y horario, sin superposiciones en el
+  mismo día) y el canal de notificación preferido (`EMAIL`, `PUSH` o `INTERNA`,
+  que es el valor inicial).
+- La reputación (`Reputacion`) guarda la suma de puntajes y la cantidad de
+  calificaciones, para filtrar y ordenar sin recorrerlas. No se edita: la única
+  forma de cambiarla es `Perfil.registrarCalificacion(puntaje)` con el puntaje de
+  una calificación que ya validó la contratación. El caso de uso de calificar
+  hará las dos cosas en una transacción. Sin calificaciones, el promedio es 0 y
+  `cantidad()` distingue ese caso.
+- La baja del perfil es lógica (regla 9): `darDeBaja` exige motivo, queda en el
+  historial (`ACTIVO → INACTIVO`) con fecha y actor, y una segunda baja se
+  rechaza. Un perfil dado de baja no se edita (`PerfilInactivoException`), pero
+  sigue recibiendo calificaciones de contrataciones anteriores.
+- `PerfilRepository` (`findByUserId`, `save`) es el puerto de persistencia del
+  perfil y vive en la raíz del módulo.
 - Toda transición válida guarda estado de origen y destino, fecha, actor y motivo
   en un historial que solo crece y se expone como lista inmodificable. Una
   operación rechazada no modifica nada.
@@ -107,8 +135,10 @@ el punto de composición cuando se conecte la implementación persistente.
   restricción única `(contratacion_id, wallet_perfil_id, tipo)`.
 - Wallet no tiene estados ni variaciones, así que no introduce un patrón nuevo.
 
-Reputación, búsqueda, recomendaciones y canales de notificación quedan para los
-siguientes hitos.
+Búsqueda, recomendaciones, el envío de notificaciones por el canal elegido y el
+perfil público quedan para los siguientes hitos. La validación de que el tipo de
+perfil coincida con el tipo de publicación cruza dos módulos y la hará el caso
+de uso de publicar.
 
 ## Casos de uso y puertos
 

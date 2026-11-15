@@ -41,4 +41,9 @@ public sealed interface EstadoContratacion
     default boolean admiteReprogramacion() {
         return false;
     }
+
+    /** Calificar no cambia el estado; solo se admite cuando la contratación terminó. */
+    default boolean admiteCalificacion() {
+        return false;
+    }
 }
