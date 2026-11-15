@@ -1,5 +1,12 @@
 package ar.edu.uade.skillswap.domain.contratacion;
 
+import ar.edu.uade.skillswap.domain.contratacion.evento.ContratacionAceptada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.ContratacionCancelada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.PagoConfirmado;
+import ar.edu.uade.skillswap.domain.contratacion.evento.ReprogramacionAceptada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.ReprogramacionPropuesta;
+import ar.edu.uade.skillswap.domain.contratacion.evento.SesionCompletada;
+import ar.edu.uade.skillswap.domain.contratacion.evento.SolicitudRecibida;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AccionNoPermitidaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AutoSolicitudException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.CalificacionDuplicadaException;
@@ -11,6 +18,7 @@ import ar.edu.uade.skillswap.domain.contratacion.strategy.ReintegroTotal;
 import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.shared.CambioEstado;
+import ar.edu.uade.skillswap.domain.shared.EventoDominio;
 import ar.edu.uade.skillswap.domain.shared.Puntaje;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
@@ -730,6 +738,228 @@ class ContratacionTest {
             assertThrows(NullPointerException.class, () -> contratacion.aceptar(PROVEEDOR, null));
 
             assertSinCambios(contratacion, "PENDIENTE", List.of());
+        }
+    }
+
+    @Nested
+    class Eventos {
+
+        @Test
+        void elFlujoFelizEmiteSusEventosEnOrden() {
+            var contratacion = pendiente();
+            var id = contratacion.id();
+            var t1 = AHORA.plusSeconds(60);
+            var t2 = AHORA.plusSeconds(120);
+            var t4 = INICIO.plusSeconds(3600);
+
+            contratacion.aceptar(PROVEEDOR, t1);
+            contratacion.pagar(CLIENTE, t2);
+            contratacion.iniciar(PROVEEDOR, INICIO);
+            contratacion.completar(PROVEEDOR, t4);
+
+            assertEquals(List.<EventoDominio>of(
+                    new SolicitudRecibida(id, CLIENTE, PROVEEDOR, AHORA),
+                    new ContratacionAceptada(id, CLIENTE, PROVEEDOR, t1),
+                    new PagoConfirmado(id, CLIENTE, PROVEEDOR, t2),
+                    new SesionCompletada(id, CLIENTE, PROVEEDOR, t4)),
+                    contratacion.extraerEventos());
+        }
+
+        @Test
+        void cadaEventoDelFlujoFelizTieneLosInteresadosDeLaTabla() {
+            var eventos = completada().extraerEventos();
+
+            assertEquals(List.of(PROVEEDOR), eventos.get(0).interesados());
+            assertEquals(List.of(CLIENTE), eventos.get(1).interesados());
+            assertEquals(List.of(PROVEEDOR), eventos.get(2).interesados());
+            assertEquals(List.of(CLIENTE, PROVEEDOR), eventos.get(3).interesados());
+        }
+
+        @Test
+        void cancelarEmiteContratacionCanceladaParaLaContraparteConElMotivo() {
+            var cancelaElCliente = aceptada();
+            cancelaElCliente.extraerEventos();
+            cancelaElCliente.cancelar(CLIENTE, "cambié de planes", POLITICA_CLIENTE, AHORA);
+
+            var cancelaElProveedor = confirmada();
+            cancelaElProveedor.extraerEventos();
+            cancelaElProveedor.cancelar(PROVEEDOR, "me enfermé", new ReintegroTotal(), AHORA);
+
+            var delCliente = cancelaElCliente.extraerEventos();
+            var delProveedor = cancelaElProveedor.extraerEventos();
+            assertEquals(List.of(new ContratacionCancelada(cancelaElCliente.id(), CLIENTE, PROVEEDOR,
+                    "cambié de planes", AHORA)), delCliente);
+            assertEquals(List.of(PROVEEDOR), delCliente.get(0).interesados());
+            assertEquals(List.of(new ContratacionCancelada(cancelaElProveedor.id(), PROVEEDOR, CLIENTE,
+                    "me enfermé", AHORA)), delProveedor);
+            assertEquals(List.of(CLIENTE), delProveedor.get(0).interesados());
+            assertTrue(delProveedor.get(0).detalle().contains("me enfermé"));
+        }
+
+        @Test
+        void retirarLaSolicitudPendienteNotificaAlProveedor() {
+            var contratacion = pendiente();
+            contratacion.extraerEventos();
+
+            contratacion.cancelar(CLIENTE, "ya no la necesito", POLITICA_CLIENTE, AHORA);
+
+            var eventos = contratacion.extraerEventos();
+            assertEquals(1, eventos.size());
+            assertEquals(List.of(PROVEEDOR), eventos.get(0).interesados());
+        }
+
+        @Test
+        void proponerYAceptarUnaReprogramacionEmitenSusEventos() {
+            var contratacion = confirmada();
+            contratacion.extraerEventos();
+            var t1 = AHORA.plusSeconds(60);
+            var t2 = AHORA.plusSeconds(120);
+
+            contratacion.proponerReprogramacion(CLIENTE, OTRA_FRANJA, OTRO_INICIO, t1);
+            contratacion.aceptarReprogramacion(PROVEEDOR, t2);
+
+            var eventos = contratacion.extraerEventos();
+            assertEquals(List.<EventoDominio>of(
+                    new ReprogramacionPropuesta(contratacion.id(), CLIENTE, PROVEEDOR, OTRO_INICIO, t1),
+                    new ReprogramacionAceptada(contratacion.id(), CLIENTE, PROVEEDOR, OTRO_INICIO, t2)),
+                    eventos);
+            assertEquals(List.of(PROVEEDOR), eventos.get(0).interesados());
+            assertEquals(List.of(CLIENTE), eventos.get(1).interesados());
+        }
+
+        @Test
+        void siProponeElProveedorLaContraparteEsElCliente() {
+            var contratacion = aceptada();
+            contratacion.extraerEventos();
+
+            contratacion.proponerReprogramacion(PROVEEDOR, OTRA_FRANJA, OTRO_INICIO, AHORA);
+            contratacion.aceptarReprogramacion(CLIENTE, AHORA);
+
+            var eventos = contratacion.extraerEventos();
+            assertEquals(List.of(CLIENTE), eventos.get(0).interesados());
+            assertEquals(List.of(PROVEEDOR), eventos.get(1).interesados());
+        }
+
+        @Test
+        void rechazarIniciarYRechazarReprogramacionNoEmitenEventos() {
+            var rechazada = pendiente();
+            rechazada.extraerEventos();
+            rechazada.rechazar(PROVEEDOR, "sin disponibilidad", AHORA);
+
+            var iniciada = confirmada();
+            iniciada.extraerEventos();
+            iniciada.iniciar(PROVEEDOR, INICIO);
+
+            var reprogramacionRechazada = confirmada();
+            reprogramacionRechazada.proponerReprogramacion(CLIENTE, OTRA_FRANJA, OTRO_INICIO, AHORA);
+            reprogramacionRechazada.extraerEventos();
+            reprogramacionRechazada.rechazarReprogramacion(PROVEEDOR, AHORA);
+
+            assertTrue(rechazada.extraerEventos().isEmpty());
+            assertTrue(iniciada.extraerEventos().isEmpty());
+            assertTrue(reprogramacionRechazada.extraerEventos().isEmpty());
+        }
+
+        @Test
+        void unaTransicionInvalidaNoAgregaEventos() {
+            List<Supplier<Contratacion>> fabricas = List.of(ContratacionTest::pendiente, ContratacionTest::aceptada,
+                    ContratacionTest::confirmada, ContratacionTest::enCurso, ContratacionTest::completada,
+                    ContratacionTest::rechazada, ContratacionTest::cancelada);
+
+            int rechazadas = 0;
+            for (var fabrica : fabricas) {
+                for (var accion : accionesConRolCorrecto().entrySet()) {
+                    var contratacion = fabrica.get();
+                    contratacion.extraerEventos();
+                    try {
+                        accion.getValue().accept(contratacion);
+                    } catch (TransicionInvalidaException esperada) {
+                        assertTrue(contratacion.extraerEventos().isEmpty(),
+                                contratacion.estado().nombre() + " " + accion.getKey());
+                        rechazadas++;
+                    }
+                }
+            }
+            assertEquals(7 * 6 - 8, rechazadas);
+        }
+
+        @Test
+        void unActorSinPermisoNoAgregaEventosNiPierdeLosPendientes() {
+            var contratacion = pendiente();
+
+            assertThrows(AccionNoPermitidaException.class, () -> contratacion.aceptar(CLIENTE, AHORA));
+            assertThrows(AccionNoPermitidaException.class,
+                    () -> contratacion.cancelar(PROVEEDOR, "motivo", new ReintegroTotal(), AHORA));
+
+            var eventos = contratacion.extraerEventos();
+            assertEquals(1, eventos.size());
+            assertInstanceOf(SolicitudRecibida.class, eventos.get(0));
+        }
+
+        @Test
+        void unaReprogramacionRechazadaNoAgregaEventos() {
+            var contratacion = confirmada();
+            contratacion.extraerEventos();
+
+            assertThrows(AccionNoPermitidaException.class,
+                    () -> contratacion.proponerReprogramacion(AJENO, OTRA_FRANJA, OTRO_INICIO, AHORA));
+            assertThrows(ReprogramacionInvalidaException.class,
+                    () -> contratacion.proponerReprogramacion(CLIENTE, FRANJA, OTRO_INICIO, AHORA));
+            assertThrows(ReprogramacionInvalidaException.class,
+                    () -> contratacion.proponerReprogramacion(CLIENTE, OTRA_FRANJA, OTRO_INICIO, INICIO));
+            assertThrows(ReprogramacionInvalidaException.class,
+                    () -> contratacion.aceptarReprogramacion(PROVEEDOR, AHORA));
+            contratacion.proponerReprogramacion(CLIENTE, OTRA_FRANJA, OTRO_INICIO, AHORA);
+            contratacion.extraerEventos();
+            assertThrows(AccionNoPermitidaException.class, () -> contratacion.aceptarReprogramacion(CLIENTE, AHORA));
+            assertThrows(ReprogramacionInvalidaException.class,
+                    () -> contratacion.aceptarReprogramacion(PROVEEDOR, INICIO));
+
+            assertTrue(contratacion.extraerEventos().isEmpty());
+        }
+
+        @Test
+        void cancelarSinMotivoNoAgregaEventos() {
+            var contratacion = aceptada();
+            contratacion.extraerEventos();
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> contratacion.cancelar(CLIENTE, " ", POLITICA_CLIENTE, AHORA));
+
+            assertTrue(contratacion.extraerEventos().isEmpty());
+        }
+
+        @Test
+        void unaTransicionSinFechaNoAgregaEventos() {
+            var contratacion = pendiente();
+            contratacion.extraerEventos();
+
+            assertThrows(NullPointerException.class, () -> contratacion.aceptar(PROVEEDOR, null));
+
+            assertTrue(contratacion.extraerEventos().isEmpty());
+        }
+
+        @Test
+        void extraerVaciaLaListaYDevuelveUnaListaInmodificable() {
+            var contratacion = aceptada();
+
+            var eventos = contratacion.extraerEventos();
+
+            assertEquals(2, eventos.size());
+            assertTrue(contratacion.extraerEventos().isEmpty());
+            assertThrows(UnsupportedOperationException.class, eventos::clear);
+            assertThrows(UnsupportedOperationException.class,
+                    () -> eventos.add(new PagoConfirmado(contratacion.id(), CLIENTE, PROVEEDOR, AHORA)));
+        }
+
+        @Test
+        void extraerNoAfectaElHistorial() {
+            var contratacion = confirmada();
+            var historial = contratacion.historial();
+
+            contratacion.extraerEventos();
+
+            assertSinCambios(contratacion, "CONFIRMADA", historial);
         }
     }
 }

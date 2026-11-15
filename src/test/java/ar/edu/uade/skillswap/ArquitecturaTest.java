@@ -29,9 +29,21 @@ class ArquitecturaTest {
             "javax.persistence.",
             "javax.swing.");
 
+    /** Notificación es genérica: conoce los eventos solo por {@code domain/shared/EventoDominio}. */
+    private static final List<String> PROHIBIDOS_EN_NOTIFICACION = List.of(
+            "ar.edu.uade.skillswap.domain.contratacion.",
+            "ar.edu.uade.skillswap.domain.publicacion.");
+
     @Test
     void elDominioNoDependeDeUiControllersMockModelJpaNiSwing() throws IOException {
         var violaciones = violaciones(MAIN.resolve("domain"), PROHIBIDOS_EN_DOMAIN);
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
+    @Test
+    void notificacionSoloDependeDeShared() throws IOException {
+        var violaciones = violaciones(MAIN.resolve("domain/notificacion"), PROHIBIDOS_EN_NOTIFICACION);
 
         assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
     }

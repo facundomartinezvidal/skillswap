@@ -15,12 +15,15 @@ ar.edu.uade.skillswap
 │   ├── contratacion/        # Agregado Contratacion, solicitud, reintegro, reprogramación y calificaciones
 │   │   ├── state/           # Patrón State: EstadoContratacion y sus estados
 │   │   ├── strategy/        # Patrón Strategy: políticas de reintegro y su factory
+│   │   ├── evento/          # Eventos de dominio que emite la contratación
+│   │   └── exception/
+│   ├── notificacion/        # Agregado Notificacion (bandeja) y su repositorio
 │   │   └── exception/
 │   ├── perfil/              # Agregado Perfil, reputación, disponibilidad semanal y su repositorio
 │   │   └── exception/
 │   ├── wallet/              # Agregado Wallet, movimientos, retención de pagos y su repositorio
 │   │   └── exception/
-│   └── shared/              # SkillCoins, Puntaje, CambioEstado y excepciones base
+│   └── shared/              # SkillCoins, Puntaje, CambioEstado, EventoDominio y excepciones base
 ├── application/             # Pendiente: casos de uso y puertos sobre el nuevo dominio
 ├── infrastructure/          # Próximo hito: JPA, Flyway y adaptadores externos
 ├── controllers/             # Contrato actual de la UI Swing
@@ -117,6 +120,36 @@ el punto de composición cuando se conecte la implementación persistente.
 - Toda transición válida guarda estado de origen y destino, fecha, actor y motivo
   en un historial que solo crece y se expone como lista inmodificable. Una
   operación rechazada no modifica nada.
+- Las operaciones de `Contratacion` que le interesan a otra parte registran un
+  evento de dominio (`EventoDominio`, en `domain/shared`) después de validarse,
+  en el mismo punto donde se registra el cambio de estado. Una operación
+  rechazada no agrega eventos. `extraerEventos()` devuelve los pendientes en
+  orden, como lista inmodificable, y vacía la lista; el caso de uso lo llamará
+  una vez, después de guardar.
+- Cada evento declara a quién le interesa, así la regla "a quién se notifica"
+  vive en el dominio:
+
+  | Evento | Lo emite | Interesados |
+  |---|---|---|
+  | `SolicitudRecibida` | `solicitar` | Proveedor |
+  | `ContratacionAceptada` | `aceptar` | Cliente |
+  | `PagoConfirmado` | `pagar` | Proveedor |
+  | `ReprogramacionPropuesta` | `proponerReprogramacion` | La contraparte de quien propone |
+  | `ReprogramacionAceptada` | `aceptarReprogramacion` | Quien propuso |
+  | `ContratacionCancelada` | `cancelar` (con motivo) | La contraparte de quien cancela |
+  | `SesionCompletada` | `completar` | Cliente y proveedor |
+
+  `rechazar`, `iniciar` y `rechazarReprogramacion` no emiten eventos porque la
+  consigna no los pide.
+- `Notificacion` (`domain/notificacion`) es un aviso genérico en la bandeja de un
+  usuario: se crea con `Notificacion.para(destinatarioId, evento)` a partir de
+  cualquier `EventoDominio`, copia tipo, título, detalle y fecha, y arranca sin
+  leer. El destinatario tiene que estar entre los interesados del evento. Solo
+  el destinatario puede marcarla como leída (`NotificacionAjenaException`) y
+  marcarla dos veces no cambia nada. No conoce `Contratacion`: depende solo de
+  `domain/shared`, y `ArquitecturaTest` lo verifica. El canal (interna, email o
+  push) no es parte de la notificación; se resolverá en aplicación según el
+  perfil.
 - Los objetos de dominio no son entidades JPA ni DTOs de la UI.
 
 ### Wallet
@@ -149,10 +182,10 @@ el punto de composición cuando se conecte la implementación persistente.
   restricción única `(contratacion_id, wallet_perfil_id, tipo)`.
 - Wallet no tiene estados ni variaciones, así que no introduce un patrón nuevo.
 
-Búsqueda, recomendaciones, el envío de notificaciones por el canal elegido y el
-perfil público quedan para los siguientes hitos. La validación de que el tipo de
-perfil coincida con el tipo de publicación cruza dos módulos y la hará el caso
-de uso de publicar.
+Búsqueda, recomendaciones, el publicador de eventos, el envío de notificaciones
+por el canal elegido y el perfil público quedan para los siguientes hitos. La
+validación de que el tipo de perfil coincida con el tipo de publicación cruza
+dos módulos y la hará el caso de uso de publicar.
 
 ## Casos de uso y puertos
 
@@ -171,10 +204,12 @@ optimista sobre la publicación, no con un conteo seguido de un guardado.
 | Strategy | Política de reintegro según quién cancela y con cuánta anticipación; más adelante, recomendaciones | `PoliticaReintegroTest`, `PoliticaReintegroFactoryTest` |
 | Decorator | Promociones acumulables sobre el precio de una publicación: cada una modifica el resultado de la anterior, y un tipo nuevo es una clase nueva | `PromocionTest`, `PrecioTest` y `PublicacionTest.Promociones` |
 | Adapter | Identidad, email/push y persistencia JPA | Pendiente: implementar puertos en infraestructura |
-| Observer | Un evento puede notificar a cliente y proveedor | Pendiente: publicador y suscriptores testeables |
+| Observer | Un evento puede notificar a cliente y proveedor | Dominio listo, falta el publicador: eventos e interesados en `ContratacionTest` y `EventosContratacionTest`, bandeja en `NotificacionTest` |
 
-State, Strategy y Decorator ya están implementados y cubiertos por tests;
-Adapter y Observer quedan para los hitos siguientes. No se
+State, Strategy y Decorator ya están implementados y cubiertos por tests. De
+Observer está listo el dominio (eventos con sus interesados y la notificación);
+el publicador y los suscriptores van en la capa de aplicación. Adapter queda
+para los hitos siguientes. No se
 introducen patrones sin una variación concreta. La UI mock actual sigue usando
 sus contratos anteriores hasta que se complete la adaptación de controllers.
 
