@@ -15,6 +15,8 @@ ar.edu.uade.skillswap
 │   │   ├── state/           # Patrón State: EstadoContratacion y sus estados
 │   │   ├── strategy/        # Patrón Strategy: políticas de reintegro y su factory
 │   │   └── exception/
+│   ├── wallet/              # Agregado Wallet, movimientos, retención de pagos y su repositorio
+│   │   └── exception/
 │   └── shared/              # SkillCoins, CambioEstado y excepciones base
 ├── application/             # Pendiente: casos de uso y puertos sobre el nuevo dominio
 ├── infrastructure/          # Próximo hito: JPA, Flyway y adaptadores externos
@@ -74,6 +76,36 @@ el punto de composición cuando se conecte la implementación persistente.
   en un historial que solo crece y se expone como lista inmodificable. Una
   operación rechazada no modifica nada.
 - Los objetos de dominio no son entidades JPA ni DTOs de la UI.
+
+### Wallet
+
+- `Wallet` se identifica por el `userId` del titular, igual que `Contratacion`.
+  Se abre con un bono de bienvenida (el monto lo decide el punto de composición,
+  no el dominio) que queda registrado como `ACREDITACION_DEMO`;
+  `acreditarDemo` permite cargar más saldo de demostración.
+- El saldo nunca es negativo (regla 4): `debitar` más de lo que hay lanza
+  `SaldoInsuficienteException` sin modificar nada. `acreditar` y `reintegrar`
+  suman al saldo. Los importes deben ser mayores que 0.
+- Cada operación crea un `Movimiento` inmutable con su tipo (`CREDITO`, `DEBITO`,
+  `REINTEGRO`, `ACREDITACION_DEMO`, los mismos del esquema), importe, saldo
+  resultante, concepto, contratación y fecha. La Wallet guarda el saldo y solo
+  los movimientos nuevos; el historial completo y paginado lo listará el
+  repositorio (`WalletRepository`).
+- **Retención del pago.** Lo pagado no va directo al proveedor: queda retenido en
+  una Wallet de garantía de la plataforma hasta que la contratación se completa.
+  El servicio de dominio `RetencionDePagos` agrupa cada débito con su crédito para
+  que no puedan separarse: `retener` (cliente → garantía, al pagar),
+  `liberarAlProveedor` (garantía → proveedor, al completar) y `repartir`
+  (garantía → cliente y proveedor según el `Reintegro`, al cancelar después del
+  pago; un monto 0 no genera movimiento y el reparto tiene que sumar el total
+  retenido). Siempre debita primero, así que si el débito falla ninguna Wallet
+  cambia, y la suma de los saldos se conserva.
+- `wallet` conoce a `contratacion` solo por `ContratacionId`. Coordinar la
+  transición de la contratación con el movimiento de fondos, y guardarlos en una
+  misma transacción, es tarea del caso de uso. El doble cobro lo impide el estado
+  de `Contratacion` (solo se paga desde `ACEPTADA`) y, en persistencia, la
+  restricción única `(contratacion_id, wallet_perfil_id, tipo)`.
+- Wallet no tiene estados ni variaciones, así que no introduce un patrón nuevo.
 
 Reputación, búsqueda, recomendaciones y canales de notificación quedan para los
 siguientes hitos.
