@@ -89,6 +89,13 @@ class EstadoContratacionTest {
     }
 
     @Test
+    void soloCompletadaAdmiteCalificacion() {
+        for (var estado : ESTADOS) {
+            assertEquals(estado instanceof Completada, estado.admiteCalificacion(), estado.nombre());
+        }
+    }
+
+    @Test
     void nombresCoincidenConLosEstadosDeLaConsigna() {
         assertEquals(List.of("PENDIENTE", "ACEPTADA", "CONFIRMADA", "EN_CURSO", "COMPLETADA", "RECHAZADA", "CANCELADA"),
                 ESTADOS.stream().map(EstadoContratacion::nombre).toList());
