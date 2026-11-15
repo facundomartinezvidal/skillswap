@@ -94,6 +94,15 @@ class EstadoPublicacionTest {
     }
 
     @Test
+    void borradorPublicadaYPausadaAdmitenPromociones() {
+        assertTrue(new Borrador().admitePromociones());
+        assertTrue(new Publicada().admitePromociones());
+        assertTrue(new Pausada().admitePromociones());
+        assertFalse(new Cerrada().admitePromociones());
+        assertFalse(new Cancelada().admitePromociones());
+    }
+
+    @Test
     void nombresCoincidenConLosEstadosDeLaConsigna() {
         assertEquals("BORRADOR", new Borrador().nombre());
         assertEquals("PUBLICADA", new Publicada().nombre());

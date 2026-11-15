@@ -10,6 +10,7 @@ ar.edu.uade.skillswap
 ├── domain/                  # Entidades, value objects y reglas Java puro
 │   ├── publicacion/         # Agregado Publicacion, franjas e ids
 │   │   ├── state/           # Patrón State: EstadoPublicacion y sus estados
+│   │   ├── decorator/       # Patrón Decorator: precio y promociones acumulables
 │   │   └── exception/
 │   ├── contratacion/        # Agregado Contratacion, solicitud, reintegro, reprogramación y calificaciones
 │   │   ├── state/           # Patrón State: EstadoContratacion y sus estados
@@ -59,6 +60,19 @@ el punto de composición cuando se conecte la implementación persistente.
 - El cupo es **por franja**: `reservarCupo(franjaId)` toma un lugar de esa franja
   y falla con `CupoAgotadoException` cuando se llena; `liberarCupo` lo devuelve.
   Lo controla el agregado `Publicacion`, no la contratación.
+- Las **promociones** modifican el precio de la publicación sin producir nunca un
+  total negativo (regla 6, caso de aceptación 9). El autor las agrega y las quita
+  con `agregarPromocion` y `quitarPromocion` en `BORRADOR`, `PUBLICADA` y
+  `PAUSADA` (`EstadoPublicacion.admitePromociones()`); en `CERRADA` o `CANCELADA`
+  se rechazan con `TransicionInvalidaException`. Son acumulables, se pueden
+  repetir y no cambian el estado ni el historial. Hay dos tipos:
+  `DescuentoPorcentual` (1 a 100 %, el descuento se redondea hacia abajo) y
+  `DescuentoFijo` (mayor a 0, con tope en 0). `precioFinal()` usa el patrón
+  Decorator (`domain/publicacion/decorator`): envuelve `PrecioBase` con un
+  `PrecioConPromocion` por promoción, en el orden en que se agregaron, porque el
+  orden cambia el resultado (100 con 10 % y −20 da 70; con −20 y 10 %, 72).
+  `precioBase()` sigue devolviendo el precio sin descuentos, y `Contratacion`
+  sigue recibiendo el precio ya calculado.
 - `Contratacion` también usa State (`domain/contratacion/state`): `PENDIENTE`,
   `ACEPTADA`, `CONFIRMADA`, `EN_CURSO`, `COMPLETADA`, `RECHAZADA` y `CANCELADA`.
   Valida el rol de quien actúa (el proveedor acepta, rechaza, inicia y completa;
@@ -155,11 +169,12 @@ optimista sobre la publicación, no con un conteo seguido de un guardado.
 |---|---|---|
 | State | Qué acciones admite cada estado de publicación y de contratación | `EstadoPublicacionTest`, `EstadoContratacionTest` y tests de los agregados |
 | Strategy | Política de reintegro según quién cancela y con cuánta anticipación; más adelante, recomendaciones | `PoliticaReintegroTest`, `PoliticaReintegroFactoryTest` |
+| Decorator | Promociones acumulables sobre el precio de una publicación: cada una modifica el resultado de la anterior, y un tipo nuevo es una clase nueva | `PromocionTest`, `PrecioTest` y `PublicacionTest.Promociones` |
 | Adapter | Identidad, email/push y persistencia JPA | Pendiente: implementar puertos en infraestructura |
 | Observer | Un evento puede notificar a cliente y proveedor | Pendiente: publicador y suscriptores testeables |
 
-State y Strategy ya están implementados y cubiertos por tests; Adapter y
-Observer quedan para los hitos siguientes. No se
+State, Strategy y Decorator ya están implementados y cubiertos por tests;
+Adapter y Observer quedan para los hitos siguientes. No se
 introducen patrones sin una variación concreta. La UI mock actual sigue usando
 sus contratos anteriores hasta que se complete la adaptación de controllers.
 

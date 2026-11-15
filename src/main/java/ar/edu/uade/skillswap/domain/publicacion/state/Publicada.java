@@ -26,4 +26,9 @@ public record Publicada() implements EstadoPublicacion {
     public boolean admiteSolicitudes() {
         return true;
     }
+
+    @Override
+    public boolean admitePromociones() {
+        return true;
+    }
 }

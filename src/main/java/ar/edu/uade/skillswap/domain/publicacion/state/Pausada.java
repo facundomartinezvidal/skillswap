@@ -22,4 +22,9 @@ public record Pausada() implements EstadoPublicacion {
     public EstadoPublicacion cancelar() {
         return new Cancelada();
     }
+
+    @Override
+    public boolean admitePromociones() {
+        return true;
+    }
 }

@@ -40,4 +40,9 @@ public sealed interface EstadoPublicacion
     default boolean admiteSolicitudes() {
         return false;
     }
+
+    /** Si el autor puede agregar o quitar promociones en este estado. */
+    default boolean admitePromociones() {
+        return false;
+    }
 }
