@@ -44,6 +44,30 @@ class PublicadorEventosTest {
     }
 
     @Test
+    void unSuscriptorQueFallaNoCortaALosDemas() {
+        var recibidos = new ArrayList<String>();
+        publicador.suscribir(evento -> {
+            throw new IllegalStateException("el servidor de email no responde");
+        });
+        publicador.suscribir(new Anotador("bandeja", recibidos));
+
+        assertDoesNotThrow(() -> publicador.publicar(List.of(solicitud, pago)));
+
+        assertEquals(List.of("bandeja:SOLICITUD_RECIBIDA", "bandeja:PAGO_CONFIRMADO"), recibidos);
+    }
+
+    @Test
+    void dosSuscriptoresIgualesPeroDistintosRecibenLosDos() {
+        var recibidos = new ArrayList<String>();
+        publicador.suscribir(new Anotador("bandeja", recibidos));
+        publicador.suscribir(new Anotador("bandeja", recibidos));
+
+        publicador.publicar(List.of(pago));
+
+        assertEquals(List.of("bandeja:PAGO_CONFIRMADO", "bandeja:PAGO_CONFIRMADO"), recibidos);
+    }
+
+    @Test
     void suscribirDosVecesAlMismoNoDuplicaLosAvisos() {
         var recibidos = new ArrayList<String>();
         var bandeja = new Anotador("bandeja", recibidos);
