@@ -1,5 +1,6 @@
 package ar.edu.uade.skillswap.domain.contratacion;
 
+import ar.edu.uade.skillswap.domain.contratacion.strategy.ReintegroTotal;
 import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
@@ -68,6 +69,46 @@ class ReconstruirContratacionTest {
 
         assertEquals("ACEPTADA", original.estado().nombre());
         assertEquals(1, original.historial().size());
+    }
+
+    @Test
+    void lasColeccionesNulasQuedanVaciasYLoObligatorioTieneMensaje() {
+        var c = aceptada();
+
+        var sinListas = Contratacion.reconstruir(c.id(), c.publicacionId(), c.clienteId(), c.proveedorId(),
+                c.solicitud(), c.franjaId(), c.inicioSesion(), c.precioAcordado(), c.estado(), null, null, null, null);
+
+        assertTrue(sinListas.historial().isEmpty());
+        assertTrue(sinListas.calificaciones().isEmpty());
+        var error = assertThrows(NullPointerException.class, () -> Contratacion.reconstruir(c.id(),
+                c.publicacionId(), null, c.proveedorId(), c.solicitud(), c.franjaId(), c.inicioSesion(),
+                c.precioAcordado(), c.estado(), null, null, null, null));
+        assertEquals("El cliente es obligatorio", error.getMessage());
+    }
+
+    @Test
+    void ocupaCupoDesdeQueSeAceptaHastaQueTermina() {
+        var c = Contratacion.solicitar(CLIENTE, PROVEEDOR, PublicacionId.generate(),
+                new Solicitud("Hola", "Mejorar mis tests", FRANJA), INICIO, new SkillCoins(100), AHORA);
+        assertFalse(c.ocupaCupo(), "PENDIENTE");
+
+        c.aceptar(PROVEEDOR, AHORA);
+        assertTrue(c.ocupaCupo(), "ACEPTADA");
+        c.pagar(CLIENTE, AHORA);
+        assertTrue(c.ocupaCupo(), "CONFIRMADA");
+        c.iniciar(PROVEEDOR, AHORA);
+        assertTrue(c.ocupaCupo(), "EN_CURSO");
+        c.completar(PROVEEDOR, AHORA);
+        assertTrue(c.ocupaCupo(), "COMPLETADA");
+
+        var rechazada = Contratacion.solicitar(CLIENTE, PROVEEDOR, PublicacionId.generate(),
+                new Solicitud("Hola", "Mejorar mis tests", FRANJA), INICIO, new SkillCoins(100), AHORA);
+        rechazada.rechazar(PROVEEDOR, "sin lugar", AHORA);
+        assertFalse(rechazada.ocupaCupo(), "RECHAZADA");
+
+        var cancelada = aceptada();
+        cancelada.cancelar(CLIENTE, "me arrepentí", new ReintegroTotal(), AHORA);
+        assertFalse(cancelada.ocupaCupo(), "CANCELADA");
     }
 
     @Test

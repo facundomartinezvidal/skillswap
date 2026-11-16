@@ -22,4 +22,9 @@ public record Confirmada() implements EstadoContratacion {
     public boolean admiteReprogramacion() {
         return true;
     }
+
+    @Override
+    public boolean ocupaCupo() {
+        return true;
+    }
 }

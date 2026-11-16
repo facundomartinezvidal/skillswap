@@ -53,6 +53,10 @@ public final class Notificacion {
                                            String detalle, Instant fecha, boolean leida) {
         Objects.requireNonNull(id, "El id de la notificación es obligatorio");
         Objects.requireNonNull(destinatarioId, "El destinatario es obligatorio");
+        Objects.requireNonNull(tipo, "El tipo es obligatorio");
+        Objects.requireNonNull(titulo, "El título es obligatorio");
+        Objects.requireNonNull(detalle, "El detalle es obligatorio");
+        Objects.requireNonNull(fecha, "La fecha es obligatoria");
         var notificacion = new Notificacion(id, destinatarioId, tipo, titulo, detalle, fecha);
         notificacion.leida = leida;
         return notificacion;

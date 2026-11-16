@@ -67,6 +67,22 @@ class ReconstruirPerfilTest {
     }
 
     @Test
+    void lasColeccionesNulasQuedanVaciasYLoObligatorioTieneMensaje() {
+        var perfil = Perfil.reconstruir("user-ana", TipoPerfil.PROFESIONAL, "Ana", null, BUENOS_AIRES, null, null,
+                null, CanalNotificacion.INTERNA, Reputacion.inicial(), true, null);
+
+        assertEquals("", perfil.biografia());
+        assertTrue(perfil.habilidades().isEmpty());
+        assertTrue(perfil.intereses().isEmpty());
+        assertTrue(perfil.disponibilidad().isEmpty());
+        assertTrue(perfil.historial().isEmpty());
+        var error = assertThrows(NullPointerException.class, () -> Perfil.reconstruir("user-ana",
+                TipoPerfil.PROFESIONAL, "Ana", null, BUENOS_AIRES, null, null, null, CanalNotificacion.INTERNA,
+                null, true, null));
+        assertEquals("La reputación es obligatoria", error.getMessage());
+    }
+
+    @Test
     void cambiarLaCopiaNoCambiaElOriginal() {
         var original = perfilCompleto();
         var copia = copiaDe(original);

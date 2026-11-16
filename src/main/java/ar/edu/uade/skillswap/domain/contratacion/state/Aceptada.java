@@ -21,4 +21,9 @@ public record Aceptada() implements EstadoContratacion {
     public boolean admiteReprogramacion() {
         return true;
     }
+
+    @Override
+    public boolean ocupaCupo() {
+        return true;
+    }
 }
