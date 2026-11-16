@@ -63,6 +63,17 @@ class ArquitecturaTest {
         assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
     }
 
+    /**
+     * Los {@code reconstruir(...)} del dominio arman un agregado en cualquier estado sin pasar por sus
+     * transiciones. Solo los usan los repositorios (infraestructura); la aplicación usa las operaciones.
+     */
+    @Test
+    void laAplicacionNoReconstruyeAgregados() throws IOException {
+        var violaciones = violaciones(MAIN.resolve("application"), List.of(".reconstruir("));
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
     @Test
     void notificacionSoloDependeDeShared() throws IOException {
         var violaciones = violaciones(MAIN.resolve("domain/notificacion"), PROHIBIDOS_EN_NOTIFICACION);
