@@ -73,12 +73,13 @@ public class ContratacionService {
 
     /**
      * Crea la contratación en PENDIENTE con el precio final de la publicación (con promociones).
-     * El cliente tiene que tener perfil activo y Wallet. La publicación valida que admita solicitudes y
+     * El cliente tiene que tener perfil activo y Wallet, y el proveedor perfil activo. La publicación valida que admita solicitudes y
      * que la franja no haya empezado y tenga lugar; el cupo se reserva recién al aceptar.
      */
     public ContratacionDTO solicitar(SolicitarContratacionCommand command) {
         validarCliente(command.clienteId());
         var publicacion = buscarPublicacion(new PublicacionId(Ids.uuid("publicación", command.publicacionId())));
+        validarProveedor(publicacion.autorId());
         var franja = publicacion.franjaParaSolicitar(new FranjaId(Ids.uuid("franja", command.franjaId())), ahora());
         var solicitud = new Solicitud(command.mensaje(), command.objetivo(), franja.id());
         var contratacion = Contratacion.solicitar(command.clienteId(), publicacion.autorId(), publicacion.id(),
@@ -289,6 +290,15 @@ public class ContratacionService {
             throw new PerfilInactivoException(clienteId, "solicitar una contratación");
         }
         buscarWallet(clienteId);
+    }
+
+    /** A un perfil dado de baja no le llegan solicitudes nuevas, aunque su publicación siga publicada. */
+    private void validarProveedor(String proveedorId) {
+        var perfil = perfilRepository.findByUserId(proveedorId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("perfil", proveedorId));
+        if (!perfil.estaActivo()) {
+            throw new PerfilInactivoException(proveedorId, "recibir solicitudes");
+        }
     }
 
     private Contratacion buscar(String contratacionId) {
