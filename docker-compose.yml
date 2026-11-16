@@ -1,0 +1,29 @@
+# MySQL de desarrollo para SkillSwap: docker compose up -d
+#
+# Usuario, contraseña y base son valores de DESARROLLO (skillswap/skillswap), no credenciales reales.
+# Son los mismos que usa BackendJpa por defecto si no se definen DB_URL, DB_USER y DB_PASSWORD.
+#
+# Se publica en el puerto 3307 de la máquina (no en el 3306) porque el 3306 suele estar ocupado por un
+# MySQL instalado localmente. Por eso la URL por defecto es jdbc:mysql://localhost:3307/skillswap.
+# El esquema no lo crea este archivo: lo crean las migraciones de Flyway al iniciar el backend.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: skillswap-mysql
+    environment:
+      MYSQL_DATABASE: skillswap
+      MYSQL_USER: skillswap
+      MYSQL_PASSWORD: skillswap
+      MYSQL_ROOT_PASSWORD: skillswap-root
+    ports:
+      - "3307:3306"
+    volumes:
+      - skillswap-datos:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uskillswap", "-pskillswap"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  skillswap-datos:
