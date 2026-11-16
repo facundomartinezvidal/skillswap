@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Regla de dependencias: el dominio es Java puro. No conoce la aplicación, la UI, los controllers,
  * el mock, los modelos de vista, JPA ni Swing. La aplicación solo conoce al dominio: tampoco depende
  * de la infraestructura ni de la presentación. Se revisa el texto de cada fuente para detectar tanto
- * imports como nombres completamente calificados.
+ * imports como nombres completamente calificados. Los controllers solo conocen Services, DTOs, modelos de
+ * vista y tipos simples del dominio.
  */
 class ArquitecturaTest {
 
@@ -48,6 +51,53 @@ class ArquitecturaTest {
     private static final List<String> PROHIBIDOS_EN_NOTIFICACION = List.of(
             "ar.edu.uade.skillswap.domain.contratacion.",
             "ar.edu.uade.skillswap.domain.publicacion.");
+
+    /** Los controllers son delgados: llaman a los Services, nunca a repositorios, JPA ni infraestructura. */
+    private static final List<String> PROHIBIDOS_EN_CONTROLLERS = List.of(
+            "ar.edu.uade.skillswap.infrastructure.",
+            "ar.edu.uade.skillswap.ui.",
+            "ar.edu.uade.skillswap.mock.",
+            "Repository",
+            "jakarta.persistence.",
+            "javax.persistence.",
+            "org.hibernate.",
+            "java.sql.",
+            "javax.swing.");
+
+    /** Del dominio, los controllers solo usan tipos simples: enums, la excepción base y la página pedida. */
+    private static final Set<String> DOMINIO_PERMITIDO_EN_CONTROLLERS = Set.of(
+            "ar.edu.uade.skillswap.domain.shared.DomainException",
+            "ar.edu.uade.skillswap.domain.shared.PaginaSolicitada",
+            "ar.edu.uade.skillswap.domain.publicacion.Modalidad",
+            "ar.edu.uade.skillswap.domain.perfil.TipoPerfil",
+            "ar.edu.uade.skillswap.domain.perfil.CanalNotificacion");
+
+    private static final Pattern TIPO_DEL_DOMINIO = Pattern.compile("ar\\.edu\\.uade\\.skillswap\\.domain\\.[\\w.]+");
+
+    @Test
+    void losControllersNoUsanRepositoriosNiInfraestructuraNiJpa() throws IOException {
+        var violaciones = violaciones(MAIN.resolve("controllers"), PROHIBIDOS_EN_CONTROLLERS);
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
+    @Test
+    void losControllersSoloUsanTiposSimplesDelDominio() throws IOException {
+        var violaciones = new ArrayList<String>();
+        for (var fuente : fuentes(MAIN.resolve("controllers"))) {
+            var usados = TIPO_DEL_DOMINIO.matcher(Files.readString(fuente));
+            while (usados.find()) {
+                var tipo = usados.group();
+                var permitido = DOMINIO_PERMITIDO_EN_CONTROLLERS.stream()
+                        .anyMatch(p -> tipo.equals(p) || tipo.startsWith(p + "."));
+                if (!permitido) {
+                    violaciones.add(fuente + " usa " + tipo);
+                }
+            }
+        }
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
 
     @Test
     void elDominioNoDependeDeUiControllersMockModelJpaNiSwing() throws IOException {
@@ -82,12 +132,7 @@ class ArquitecturaTest {
     }
 
     private static List<String> violaciones(Path directorio, List<String> prohibidos) throws IOException {
-        List<Path> fuentes;
-        try (var files = Files.walk(directorio)) {
-            fuentes = files.filter(file -> file.toString().endsWith(".java")).toList();
-        }
-        assertFalse(fuentes.isEmpty(), "No hay fuentes en " + directorio);
-
+        var fuentes = fuentes(directorio);
         var violaciones = new ArrayList<String>();
         for (var fuente : fuentes) {
             var codigo = Files.readString(fuente);
@@ -98,5 +143,14 @@ class ArquitecturaTest {
             }
         }
         return violaciones;
+    }
+
+    private static List<Path> fuentes(Path directorio) throws IOException {
+        List<Path> fuentes;
+        try (var files = Files.walk(directorio)) {
+            fuentes = files.filter(file -> file.toString().endsWith(".java")).toList();
+        }
+        assertFalse(fuentes.isEmpty(), "No hay fuentes en " + directorio);
+        return fuentes;
     }
 }
