@@ -204,6 +204,16 @@ class ContratacionServiceTest {
         }
 
         @Test
+        void unProveedorDadoDeBajaNoRecibeSolicitudes() {
+            var ana = perfiles.findByUserId(PROVEEDOR).orElseThrow();
+            ana.darDeBaja(PROVEEDOR, "me voy", AHORA);
+            perfiles.save(ana);
+
+            assertThrows(PerfilInactivoException.class, () -> solicitar(CLIENTE, en72Horas));
+            assertTrue(eventos.isEmpty());
+        }
+
+        @Test
         void unaPublicacionInexistenteSeInformaComoNoEncontrada() {
             var command = new SolicitarContratacionCommand(CLIENTE, UUID.randomUUID().toString(),
                     en72Horas.valor().toString(), "Hola", "Aprender");
