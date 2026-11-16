@@ -27,4 +27,9 @@ public record Pausada() implements EstadoPublicacion {
     public boolean admitePromociones() {
         return true;
     }
+
+    @Override
+    public boolean esVisibleParaTodos() {
+        return false;
+    }
 }

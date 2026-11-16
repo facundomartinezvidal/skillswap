@@ -464,15 +464,18 @@ class PublicacionTest {
             assertTrue(publicacion.franjas().get(0).estaOcupada(publicacion.cupo()));
         }
 
+        /**
+         * Pausar corta las solicitudes nuevas, pero el proveedor tiene que poder aceptar las que ya
+         * recibió. Por eso reservar no mira el estado: las solicitudes nuevas las frena
+         * {@code franjaParaSolicitar}.
+         */
         @Test
-        void reservarFallaSiLaPublicacionNoEstaPublicada() {
-            for (var publicacion : List.of(borradorCompleto(1), pausada(), cerrada(), cancelada())) {
-                var franja = publicacion.franjas().get(0).id();
+        void reservarNoDependeDeQueLaPublicacionAdmitaSolicitudesNuevas() {
+            var publicacion = pausada();
+            var franja = publicacion.franjas().get(0).id();
 
-                assertThrows(TransicionInvalidaException.class, () -> publicacion.reservarCupo(franja),
-                        publicacion.estado().nombre());
-                assertEquals(0, reservados(publicacion, franja));
-            }
+            assertDoesNotThrow(() -> publicacion.reservarCupo(franja));
+            assertEquals(1, reservados(publicacion, franja));
         }
 
         @Test

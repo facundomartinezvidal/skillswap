@@ -11,4 +11,9 @@ public record EnCurso() implements EstadoContratacion {
     public EstadoContratacion completar() {
         return new Completada();
     }
+
+    @Override
+    public boolean ocupaCupo() {
+        return true;
+    }
 }

@@ -54,6 +54,31 @@ public final class Perfil {
         return new Perfil(userId, tipo, nombreVisible, zonaHoraria);
     }
 
+    /**
+     * Vuelve a armar un perfil guardado, activo o dado de baja, con su reputación acumulada. Lo usan solo
+     * los repositorios (JPA o en memoria; {@code ArquitecturaTest} lo verifica). No vuelve a validar reglas:
+     * los datos ya las cumplieron al guardarse. La biografía y las colecciones nulas quedan vacías.
+     */
+    public static Perfil reconstruir(String userId, TipoPerfil tipo, String nombreVisible, String biografia,
+                                     ZoneId zonaHoraria, Set<String> habilidades, Set<String> intereses,
+                                     List<DisponibilidadSemanal> disponibilidad, CanalNotificacion canal,
+                                     Reputacion reputacion, boolean activo, List<CambioEstado> historial) {
+        Objects.requireNonNull(userId, "El usuario del perfil es obligatorio");
+        Objects.requireNonNull(tipo, "El tipo de perfil es obligatorio");
+        Objects.requireNonNull(nombreVisible, "El nombre visible es obligatorio");
+        Objects.requireNonNull(zonaHoraria, "La zona horaria es obligatoria");
+        var perfil = new Perfil(userId, tipo, nombreVisible, zonaHoraria);
+        perfil.biografia = biografia == null ? "" : biografia;
+        perfil.habilidades = habilidades == null ? Set.of() : Set.copyOf(habilidades);
+        perfil.intereses = intereses == null ? Set.of() : Set.copyOf(intereses);
+        perfil.disponibilidad.addAll(disponibilidad == null ? List.of() : disponibilidad);
+        perfil.canal = Objects.requireNonNull(canal, "El canal de notificación es obligatorio");
+        perfil.reputacion = Objects.requireNonNull(reputacion, "La reputación es obligatoria");
+        perfil.activo = activo;
+        perfil.historial.addAll(historial == null ? List.of() : historial);
+        return perfil;
+    }
+
     /** Reemplaza los datos básicos. La biografía es opcional. */
     public void editarDatos(String nombreVisible, String biografia, ZoneId zonaHoraria) {
         requireActivo("editar los datos");

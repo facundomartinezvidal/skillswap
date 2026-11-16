@@ -84,6 +84,37 @@ public final class Contratacion {
         return contratacion;
     }
 
+    /**
+     * Vuelve a armar una contratación guardada, en el estado en que quedó y sin eventos pendientes
+     * (ya se publicaron al guardarla). Lo usan solo los repositorios (JPA o en memoria;
+     * {@code ArquitecturaTest} lo verifica). No vuelve a validar reglas: los datos ya las cumplieron al
+     * guardarse. {@code propuesta} y {@code reintegro} pueden ser nulos; las colecciones nulas quedan vacías.
+     */
+    public static Contratacion reconstruir(ContratacionId id, PublicacionId publicacionId, String clienteId,
+                                           String proveedorId, Solicitud solicitud, FranjaId franjaId,
+                                           Instant inicioSesion, SkillCoins precioAcordado, EstadoContratacion estado,
+                                           PropuestaReprogramacion propuesta, Reintegro reintegro,
+                                           List<CambioEstado> historial, List<Calificacion> calificaciones) {
+        Objects.requireNonNull(id, "El id de la contratación es obligatorio");
+        Objects.requireNonNull(publicacionId, "La publicación es obligatoria");
+        Objects.requireNonNull(clienteId, "El cliente es obligatorio");
+        Objects.requireNonNull(proveedorId, "El proveedor es obligatorio");
+        Objects.requireNonNull(solicitud, "La solicitud es obligatoria");
+        Objects.requireNonNull(franjaId, "La franja es obligatoria");
+        Objects.requireNonNull(inicioSesion, "El inicio de la sesión es obligatorio");
+        Objects.requireNonNull(precioAcordado, "El precio acordado es obligatorio");
+        Objects.requireNonNull(estado, "El estado de la contratación es obligatorio");
+        var contratacion = new Contratacion(id, publicacionId, clienteId, proveedorId, solicitud, inicioSesion,
+                precioAcordado);
+        contratacion.franjaId = franjaId;
+        contratacion.estado = estado;
+        contratacion.propuesta = propuesta;
+        contratacion.reintegro = reintegro;
+        contratacion.historial.addAll(historial == null ? List.of() : historial);
+        contratacion.calificaciones.addAll(calificaciones == null ? List.of() : calificaciones);
+        return contratacion;
+    }
+
     public void aceptar(String actorId, Instant ahora) {
         requireProveedor(actorId, "aceptar");
         transitionTo(estado.aceptar(), actorId, null, ahora);
@@ -189,6 +220,11 @@ public final class Contratacion {
                 comentario, ahora);
         calificaciones.add(calificacion);
         return calificacion;
+    }
+
+    /** Si tiene un lugar tomado en su franja: el cupo se reserva al aceptar y se libera al cancelar. */
+    public boolean ocupaCupo() {
+        return estado.ocupaCupo();
     }
 
     public boolean esParticipante(String userId) {

@@ -4,6 +4,7 @@ import ar.edu.uade.skillswap.domain.publicacion.decorator.Precio;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.PrecioBase;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.PrecioConPromocion;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.Promocion;
+import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
 import ar.edu.uade.skillswap.domain.publicacion.state.Borrador;
@@ -54,6 +55,42 @@ public final class Publicacion {
         }
         Objects.requireNonNull(tipo, "El tipo de publicación es obligatorio");
         return new Publicacion(PublicacionId.generate(), autorId, tipo);
+    }
+
+    /**
+     * Vuelve a armar una publicación guardada, en el estado en que quedó. Lo usan solo los repositorios
+     * (JPA o en memoria; {@code ArquitecturaTest} lo verifica). No vuelve a validar reglas: los datos ya
+     * las cumplieron al guardarse. Copia cada franja, así la publicación nueva no comparte sus reservas
+     * con la que se usó para armarla. Las colecciones nulas quedan vacías.
+     */
+    public static Publicacion reconstruir(PublicacionId id, String autorId, TipoPublicacion tipo, String titulo,
+                                         String descripcion, String categoria, Modalidad modalidad,
+                                         Duration duracionEstimada, int cupo, SkillCoins precioBase,
+                                         Set<String> etiquetas, EstadoPublicacion estado, String motivoCancelacion,
+                                         List<FranjaDisponibilidad> franjas, List<Promocion> promociones,
+                                         List<CambioEstado> historial) {
+        Objects.requireNonNull(id, "El id de la publicación es obligatorio");
+        Objects.requireNonNull(autorId, "El autor de la publicación es obligatorio");
+        Objects.requireNonNull(tipo, "El tipo de publicación es obligatorio");
+        Objects.requireNonNull(estado, "El estado de la publicación es obligatorio");
+        var publicacion = new Publicacion(id, autorId, tipo);
+        publicacion.titulo = titulo;
+        publicacion.descripcion = descripcion;
+        publicacion.categoria = categoria;
+        publicacion.modalidad = modalidad;
+        publicacion.duracionEstimada = duracionEstimada;
+        publicacion.cupo = cupo;
+        publicacion.precioBase = precioBase;
+        publicacion.etiquetas = etiquetas == null ? Set.of() : Set.copyOf(etiquetas);
+        publicacion.estado = estado;
+        publicacion.motivoCancelacion = motivoCancelacion;
+        for (var franja : vacioSiEsNulo(franjas)) {
+            publicacion.franjas.add(FranjaDisponibilidad.reconstruir(franja.id(), franja.inicio(), franja.fin(),
+                    franja.reservados()));
+        }
+        publicacion.promociones.addAll(vacioSiEsNulo(promociones));
+        publicacion.historial.addAll(vacioSiEsNulo(historial));
+        return publicacion;
     }
 
     /** Reemplaza el contenido editable. Solo en BORRADOR; los datos pueden quedar incompletos. */
@@ -116,12 +153,46 @@ public final class Publicacion {
         return estado.admiteSolicitudes();
     }
 
-    /** Toma un lugar de la franja (el cupo es por franja). */
-    public void reservarCupo(FranjaId franjaId) {
+    /**
+     * La franja elegida para una solicitud nueva. Falla si la publicación no admite solicitudes
+     * (regla 2) o si la franja no está disponible ({@link #franjaDisponible}).
+     * No reserva: el cupo se toma recién cuando el proveedor acepta.
+     */
+    public FranjaDisponibilidad franjaParaSolicitar(FranjaId franjaId, Instant ahora) {
         if (!admiteSolicitudes()) {
-            throw new TransicionInvalidaException(estado.nombre(), "reservar cupo");
+            throw new TransicionInvalidaException(estado.nombre(), "solicitar");
         }
+        return franjaDisponible(franjaId, ahora);
+    }
+
+    /**
+     * La franja elegida, si es de esta publicación, todavía no empezó y tiene lugar (regla 3).
+     * No mira el estado de la publicación: también la usa la reprogramación de una contratación que ya
+     * existe, que sigue valiendo aunque la publicación esté pausada.
+     */
+    public FranjaDisponibilidad franjaDisponible(FranjaId franjaId, Instant ahora) {
+        Objects.requireNonNull(ahora, "El momento de la consulta es obligatorio");
+        var franja = findFranja(franjaId);
+        if (!franja.inicio().isAfter(ahora)) {
+            throw new FranjaInvalidaException("La franja ya empezó: no se puede elegir");
+        }
+        if (franja.estaOcupada(cupo)) {
+            throw new CupoAgotadoException(franjaId, cupo);
+        }
+        return franja;
+    }
+
+    /**
+     * Toma un lugar de la franja (el cupo es por franja). No depende de que la publicación admita
+     * solicitudes nuevas: el proveedor puede aceptar una solicitud que recibió antes de pausar.
+     */
+    public void reservarCupo(FranjaId franjaId) {
         findFranja(franjaId).reservar(cupo);
+    }
+
+    /** Un BORRADOR o una PAUSADA solo la ve su autor; los demás estados los ve cualquiera. */
+    public boolean esVisiblePara(String userId) {
+        return autorId.equals(userId) || estado.esVisibleParaTodos();
     }
 
     /** Devuelve un lugar de la franja. Nunca baja de cero. */
@@ -267,5 +338,9 @@ public final class Publicacion {
 
     public List<CambioEstado> historial() {
         return List.copyOf(historial);
+    }
+
+    private static <T> List<T> vacioSiEsNulo(List<T> valores) {
+        return valores == null ? List.of() : valores;
     }
 }
