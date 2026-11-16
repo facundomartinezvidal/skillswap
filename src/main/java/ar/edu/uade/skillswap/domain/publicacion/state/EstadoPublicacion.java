@@ -41,6 +41,11 @@ public sealed interface EstadoPublicacion
         return false;
     }
 
+    /** Si la ve cualquier usuario. Un BORRADOR o una PAUSADA solo la ve su autor. */
+    default boolean esVisibleParaTodos() {
+        return true;
+    }
+
     /** Si el autor puede agregar o quitar promociones en este estado. */
     default boolean admitePromociones() {
         return false;

@@ -13,7 +13,10 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Reglas 2 y 3 al elegir la franja de una solicitud: publicación publicada y franja con lugar. */
+/**
+ * Reglas 2 y 3 al elegir una franja: para una solicitud nueva la publicación tiene que admitir
+ * solicitudes; además, la franja tiene que ser suya, no haber empezado y tener lugar.
+ */
 class FranjaDisponibleTest {
 
     private static final String AUTOR = "user-ana";
@@ -36,7 +39,7 @@ class FranjaDisponibleTest {
         crearBorrador(2);
         publicacion.publicar(AUTOR, AHORA);
 
-        var elegida = publicacion.franjaDisponible(franja);
+        var elegida = publicacion.franjaParaSolicitar(franja, AHORA);
 
         assertEquals(franja, elegida.id());
         assertEquals(LUNES_10, elegida.inicio());
@@ -44,15 +47,36 @@ class FranjaDisponibleTest {
     }
 
     @Test
-    void unaPublicacionNoPublicadaNoAdmiteSolicitudes() {
+    void unaPublicacionNoPublicadaNoAdmiteSolicitudesNuevas() {
         crearBorrador(2);
 
-        var error = assertThrows(TransicionInvalidaException.class, () -> publicacion.franjaDisponible(franja));
+        var error = assertThrows(TransicionInvalidaException.class,
+                () -> publicacion.franjaParaSolicitar(franja, AHORA));
         assertEquals("BORRADOR", error.estado());
 
         publicacion.publicar(AUTOR, AHORA);
         publicacion.pausar(AUTOR, "vacaciones", AHORA);
-        assertThrows(TransicionInvalidaException.class, () -> publicacion.franjaDisponible(franja));
+        assertThrows(TransicionInvalidaException.class, () -> publicacion.franjaParaSolicitar(franja, AHORA));
+    }
+
+    @Test
+    void conLaPublicacionPausadaLaFranjaSigueDisponibleParaReprogramar() {
+        crearBorrador(2);
+        publicacion.publicar(AUTOR, AHORA);
+        publicacion.pausar(AUTOR, "vacaciones", AHORA);
+
+        assertEquals(franja, publicacion.franjaDisponible(franja, AHORA).id());
+    }
+
+    @Test
+    void unaFranjaQueYaEmpezoSeRechaza() {
+        crearBorrador(2);
+        publicacion.publicar(AUTOR, AHORA);
+
+        assertThrows(FranjaInvalidaException.class, () -> publicacion.franjaParaSolicitar(franja, LUNES_10));
+        assertThrows(FranjaInvalidaException.class,
+                () -> publicacion.franjaDisponible(franja, LUNES_10.plusSeconds(1)));
+        assertDoesNotThrow(() -> publicacion.franjaDisponible(franja, LUNES_10.minusSeconds(1)));
     }
 
     @Test
@@ -60,7 +84,8 @@ class FranjaDisponibleTest {
         crearBorrador(2);
         publicacion.publicar(AUTOR, AHORA);
 
-        assertThrows(FranjaInvalidaException.class, () -> publicacion.franjaDisponible(FranjaId.generate()));
+        assertThrows(FranjaInvalidaException.class,
+                () -> publicacion.franjaParaSolicitar(FranjaId.generate(), AHORA));
     }
 
     @Test
@@ -69,6 +94,24 @@ class FranjaDisponibleTest {
         publicacion.publicar(AUTOR, AHORA);
         publicacion.reservarCupo(franja);
 
-        assertThrows(CupoAgotadoException.class, () -> publicacion.franjaDisponible(franja));
+        assertThrows(CupoAgotadoException.class, () -> publicacion.franjaParaSolicitar(franja, AHORA));
+        assertThrows(CupoAgotadoException.class, () -> publicacion.franjaDisponible(franja, AHORA));
+    }
+
+    @Test
+    void unBorradorYUnaPausadaSoloLosVeElAutor() {
+        crearBorrador(1);
+        assertTrue(publicacion.esVisiblePara(AUTOR));
+        assertFalse(publicacion.esVisiblePara("user-mateo"));
+
+        publicacion.publicar(AUTOR, AHORA);
+        assertTrue(publicacion.esVisiblePara("user-mateo"));
+
+        publicacion.pausar(AUTOR, "vacaciones", AHORA);
+        assertFalse(publicacion.esVisiblePara("user-mateo"));
+        assertTrue(publicacion.esVisiblePara(AUTOR));
+
+        publicacion.cerrar(AUTOR, null, AHORA);
+        assertTrue(publicacion.esVisiblePara("user-mateo"));
     }
 }

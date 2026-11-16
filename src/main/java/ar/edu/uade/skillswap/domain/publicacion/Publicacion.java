@@ -58,8 +58,10 @@ public final class Publicacion {
     }
 
     /**
-     * Vuelve a armar una publicación guardada, en el estado en que quedó. Lo usan los repositorios
-     * (JPA o en memoria). No vuelve a validar reglas: los datos ya las cumplieron al guardarse.
+     * Vuelve a armar una publicación guardada, en el estado en que quedó. Lo usan solo los repositorios
+     * (JPA o en memoria; {@code ArquitecturaTest} lo verifica). No vuelve a validar reglas: los datos ya
+     * las cumplieron al guardarse. Copia cada franja, así la publicación nueva no comparte sus reservas
+     * con la que se usó para armarla. Las colecciones nulas quedan vacías.
      */
     public static Publicacion reconstruir(PublicacionId id, String autorId, TipoPublicacion tipo, String titulo,
                                          String descripcion, String categoria, Modalidad modalidad,
@@ -82,9 +84,12 @@ public final class Publicacion {
         publicacion.etiquetas = etiquetas == null ? Set.of() : Set.copyOf(etiquetas);
         publicacion.estado = estado;
         publicacion.motivoCancelacion = motivoCancelacion;
-        publicacion.franjas.addAll(franjas);
-        publicacion.promociones.addAll(promociones);
-        publicacion.historial.addAll(historial);
+        for (var franja : vacioSiEsNulo(franjas)) {
+            publicacion.franjas.add(FranjaDisponibilidad.reconstruir(franja.id(), franja.inicio(), franja.fin(),
+                    franja.reservados()));
+        }
+        publicacion.promociones.addAll(vacioSiEsNulo(promociones));
+        publicacion.historial.addAll(vacioSiEsNulo(historial));
         return publicacion;
     }
 
@@ -149,27 +154,45 @@ public final class Publicacion {
     }
 
     /**
-     * La franja elegida para solicitar o reprogramar. Falla si la publicación no admite solicitudes
-     * (regla 2), si la franja no es de esta publicación o si ya no tiene lugar (regla 3).
+     * La franja elegida para una solicitud nueva. Falla si la publicación no admite solicitudes
+     * (regla 2) o si la franja no está disponible ({@link #franjaDisponible}).
      * No reserva: el cupo se toma recién cuando el proveedor acepta.
      */
-    public FranjaDisponibilidad franjaDisponible(FranjaId franjaId) {
+    public FranjaDisponibilidad franjaParaSolicitar(FranjaId franjaId, Instant ahora) {
         if (!admiteSolicitudes()) {
             throw new TransicionInvalidaException(estado.nombre(), "solicitar");
         }
+        return franjaDisponible(franjaId, ahora);
+    }
+
+    /**
+     * La franja elegida, si es de esta publicación, todavía no empezó y tiene lugar (regla 3).
+     * No mira el estado de la publicación: también la usa la reprogramación de una contratación que ya
+     * existe, que sigue valiendo aunque la publicación esté pausada.
+     */
+    public FranjaDisponibilidad franjaDisponible(FranjaId franjaId, Instant ahora) {
+        Objects.requireNonNull(ahora, "El momento de la consulta es obligatorio");
         var franja = findFranja(franjaId);
+        if (!franja.inicio().isAfter(ahora)) {
+            throw new FranjaInvalidaException("La franja ya empezó: no se puede elegir");
+        }
         if (franja.estaOcupada(cupo)) {
             throw new CupoAgotadoException(franjaId, cupo);
         }
         return franja;
     }
 
-    /** Toma un lugar de la franja (el cupo es por franja). */
+    /**
+     * Toma un lugar de la franja (el cupo es por franja). No depende de que la publicación admita
+     * solicitudes nuevas: el proveedor puede aceptar una solicitud que recibió antes de pausar.
+     */
     public void reservarCupo(FranjaId franjaId) {
-        if (!admiteSolicitudes()) {
-            throw new TransicionInvalidaException(estado.nombre(), "reservar cupo");
-        }
         findFranja(franjaId).reservar(cupo);
+    }
+
+    /** Un BORRADOR o una PAUSADA solo la ve su autor; los demás estados los ve cualquiera. */
+    public boolean esVisiblePara(String userId) {
+        return autorId.equals(userId) || estado.esVisibleParaTodos();
     }
 
     /** Devuelve un lugar de la franja. Nunca baja de cero. */
@@ -315,5 +338,9 @@ public final class Publicacion {
 
     public List<CambioEstado> historial() {
         return List.copyOf(historial);
+    }
+
+    private static <T> List<T> vacioSiEsNulo(List<T> valores) {
+        return valores == null ? List.of() : valores;
     }
 }

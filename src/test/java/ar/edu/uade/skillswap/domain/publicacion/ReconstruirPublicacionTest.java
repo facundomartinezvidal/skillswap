@@ -35,14 +35,11 @@ class ReconstruirPublicacionTest {
         original.reservarCupo(franja);
     }
 
-    /** Lo mismo que hace un repositorio: armarla de nuevo a partir de lo que guardó. */
+    /** Lo mismo que hace un repositorio: armarla de nuevo a partir de lo que guardó, con sus propias franjas. */
     private static Publicacion copiaDe(Publicacion p) {
-        var franjas = p.franjas().stream()
-                .map(f -> FranjaDisponibilidad.reconstruir(f.id(), f.inicio(), f.fin(), f.reservados()))
-                .toList();
         return Publicacion.reconstruir(p.id(), p.autorId(), p.tipo(), p.titulo(), p.descripcion(), p.categoria(),
                 p.modalidad(), p.duracionEstimada(), p.cupo(), p.precioBase(), p.etiquetas(), p.estado(),
-                p.motivoCancelacion(), franjas, p.promociones(), p.historial());
+                p.motivoCancelacion(), p.franjas(), p.promociones(), p.historial());
     }
 
     @Test
@@ -75,6 +72,33 @@ class ReconstruirPublicacionTest {
 
         assertEquals(1, original.franjas().get(0).reservados());
         assertEquals("PUBLICADA", original.estado().nombre());
+    }
+
+    @Test
+    void reservarEnLaCopiaNoCambiaLasFranjasDeLaOriginal() {
+        var copia = copiaDe(original);
+        var otra = original.franjas().get(0);
+
+        copia.liberarCupo(franja);
+
+        assertNotSame(otra, copia.franjas().get(0));
+        assertEquals(1, original.franjas().get(0).reservados());
+        assertEquals(0, copia.franjas().get(0).reservados());
+    }
+
+    @Test
+    void lasColeccionesNulasQuedanVaciasYLoObligatorioTieneMensaje() {
+        var borrador = Publicacion.reconstruir(PublicacionId.generate(), AUTOR, TipoPublicacion.OFERTA, null, null,
+                null, null, null, 0, null, null, original.estado(), null, null, null, null);
+
+        assertTrue(borrador.etiquetas().isEmpty());
+        assertTrue(borrador.franjas().isEmpty());
+        assertTrue(borrador.promociones().isEmpty());
+        assertTrue(borrador.historial().isEmpty());
+        var error = assertThrows(NullPointerException.class, () -> Publicacion.reconstruir(PublicacionId.generate(),
+                null, TipoPublicacion.OFERTA, null, null, null, null, null, 0, null, null, original.estado(), null,
+                null, null, null));
+        assertEquals("El autor de la publicación es obligatorio", error.getMessage());
     }
 
     @Test
