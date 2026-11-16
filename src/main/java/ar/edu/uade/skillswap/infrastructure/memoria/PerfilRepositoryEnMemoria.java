@@ -3,7 +3,9 @@ package ar.edu.uade.skillswap.infrastructure.memoria;
 import ar.edu.uade.skillswap.domain.perfil.Perfil;
 import ar.edu.uade.skillswap.domain.perfil.PerfilRepository;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -24,6 +26,16 @@ public class PerfilRepositoryEnMemoria implements PerfilRepository {
     @Override
     public Optional<Perfil> findByUserId(String userId) {
         return Optional.ofNullable(perfiles.get(userId)).map(PerfilRepositoryEnMemoria::copiar);
+    }
+
+    @Override
+    public List<Perfil> findByUserIds(Collection<String> userIds) {
+        return userIds.stream()
+                .distinct()
+                .map(perfiles::get)
+                .filter(Objects::nonNull)
+                .map(PerfilRepositoryEnMemoria::copiar)
+                .toList();
     }
 
     @Override
