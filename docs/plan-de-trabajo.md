@@ -7,7 +7,7 @@ Estado por hito. ✅ hecho · 🔶 en revisión (PR abierto) · ⬜ pendiente.
 - ✅ Consigna transcripta en `docs/consigna/`.
 - ✅ Decisiones de dominio acordadas (cupo por franja, reprogramación con aceptación de la otra parte, reintegro 100/50/0 % con 48 h y 24 h configurables): `AGENTS.md`.
 - ✅ Decisiones de la capa de aplicación en formato problema → alternativa → consecuencias → evidencia: `docs/decisiones-capa-aplicacion.md`.
-- ⬜ Diagrama de clases completo de dominio y aplicación en **StarUML**, con relaciones, multiplicidades y patrones identificados. Los PRs tienen un `classDiagram` Mermaid de cada parte, para partir de ahí.
+- ⬜ Diagrama de clases completo de dominio y aplicación en **StarUML**, con relaciones, multiplicidades y patrones identificados. Base para copiarlo: `docs/diagramas.md` (aplicación e infraestructura) y los `classDiagram` de los PRs del dominio.
 
 ## Hito 2 · Núcleo
 
