@@ -53,6 +53,18 @@ public final class Wallet {
         return new Wallet(TITULAR_GARANTIA, new SkillCoins(0));
     }
 
+    /**
+     * Vuelve a armar una Wallet guardada (también la de garantía) con su saldo y sin movimientos nuevos:
+     * los anteriores ya están en el repositorio. Lo usan los repositorios (JPA o en memoria).
+     */
+    public static Wallet reconstruir(String titularId, SkillCoins saldo) {
+        if (titularId == null || titularId.isBlank()) {
+            throw new IllegalArgumentException("El titular de la Wallet es obligatorio");
+        }
+        Objects.requireNonNull(saldo, "El saldo es obligatorio");
+        return new Wallet(titularId, saldo);
+    }
+
     /** Resta el importe; si el saldo no alcanza lanza {@link SaldoInsuficienteException} sin modificar nada. */
     public Movimiento debitar(SkillCoins importe, String concepto, ContratacionId contratacionId, Instant ahora) {
         validar(importe, concepto, contratacionId, ahora);

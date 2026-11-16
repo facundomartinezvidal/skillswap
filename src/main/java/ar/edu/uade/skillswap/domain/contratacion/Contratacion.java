@@ -84,6 +84,31 @@ public final class Contratacion {
         return contratacion;
     }
 
+    /**
+     * Vuelve a armar una contratación guardada, en el estado en que quedó y sin eventos pendientes
+     * (ya se publicaron al guardarla). Lo usan los repositorios (JPA o en memoria). No vuelve a validar
+     * reglas: los datos ya las cumplieron al guardarse. {@code propuesta} y {@code reintegro} pueden ser nulos.
+     */
+    public static Contratacion reconstruir(ContratacionId id, PublicacionId publicacionId, String clienteId,
+                                           String proveedorId, Solicitud solicitud, FranjaId franjaId,
+                                           Instant inicioSesion, SkillCoins precioAcordado, EstadoContratacion estado,
+                                           PropuestaReprogramacion propuesta, Reintegro reintegro,
+                                           List<CambioEstado> historial, List<Calificacion> calificaciones) {
+        Objects.requireNonNull(id, "El id de la contratación es obligatorio");
+        Objects.requireNonNull(solicitud, "La solicitud es obligatoria");
+        Objects.requireNonNull(franjaId, "La franja es obligatoria");
+        Objects.requireNonNull(estado, "El estado de la contratación es obligatorio");
+        var contratacion = new Contratacion(id, publicacionId, clienteId, proveedorId, solicitud, inicioSesion,
+                precioAcordado);
+        contratacion.franjaId = franjaId;
+        contratacion.estado = estado;
+        contratacion.propuesta = propuesta;
+        contratacion.reintegro = reintegro;
+        contratacion.historial.addAll(historial);
+        contratacion.calificaciones.addAll(calificaciones);
+        return contratacion;
+    }
+
     public void aceptar(String actorId, Instant ahora) {
         requireProveedor(actorId, "aceptar");
         transitionTo(estado.aceptar(), actorId, null, ahora);

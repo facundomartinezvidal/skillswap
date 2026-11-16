@@ -48,6 +48,16 @@ public final class Notificacion {
                 Objects.requireNonNull(evento.ocurridoEn(), "La fecha del evento es obligatoria"));
     }
 
+    /** Vuelve a armar una notificación guardada, leída o no. Lo usan los repositorios (JPA o en memoria). */
+    public static Notificacion reconstruir(NotificacionId id, String destinatarioId, String tipo, String titulo,
+                                           String detalle, Instant fecha, boolean leida) {
+        Objects.requireNonNull(id, "El id de la notificación es obligatorio");
+        Objects.requireNonNull(destinatarioId, "El destinatario es obligatorio");
+        var notificacion = new Notificacion(id, destinatarioId, tipo, titulo, detalle, fecha);
+        notificacion.leida = leida;
+        return notificacion;
+    }
+
     /** Solo el destinatario puede marcarla. Marcarla de nuevo no cambia nada. */
     public void marcarLeida(String actorId) {
         if (!destinatarioId.equals(actorId)) {

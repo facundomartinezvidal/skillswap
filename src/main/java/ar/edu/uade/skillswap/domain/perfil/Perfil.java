@@ -54,6 +54,28 @@ public final class Perfil {
         return new Perfil(userId, tipo, nombreVisible, zonaHoraria);
     }
 
+    /**
+     * Vuelve a armar un perfil guardado, activo o dado de baja, con su reputación acumulada. Lo usan los
+     * repositorios (JPA o en memoria). No vuelve a validar reglas: los datos ya las cumplieron al guardarse.
+     */
+    public static Perfil reconstruir(String userId, TipoPerfil tipo, String nombreVisible, String biografia,
+                                     ZoneId zonaHoraria, Set<String> habilidades, Set<String> intereses,
+                                     List<DisponibilidadSemanal> disponibilidad, CanalNotificacion canal,
+                                     Reputacion reputacion, boolean activo, List<CambioEstado> historial) {
+        Objects.requireNonNull(userId, "El usuario del perfil es obligatorio");
+        Objects.requireNonNull(tipo, "El tipo de perfil es obligatorio");
+        var perfil = new Perfil(userId, tipo, nombreVisible, zonaHoraria);
+        perfil.biografia = biografia == null ? "" : biografia;
+        perfil.habilidades = Set.copyOf(habilidades);
+        perfil.intereses = Set.copyOf(intereses);
+        perfil.disponibilidad.addAll(disponibilidad);
+        perfil.canal = Objects.requireNonNull(canal, "El canal de notificación es obligatorio");
+        perfil.reputacion = Objects.requireNonNull(reputacion, "La reputación es obligatoria");
+        perfil.activo = activo;
+        perfil.historial.addAll(historial);
+        return perfil;
+    }
+
     /** Reemplaza los datos básicos. La biografía es opcional. */
     public void editarDatos(String nombreVisible, String biografia, ZoneId zonaHoraria) {
         requireActivo("editar los datos");

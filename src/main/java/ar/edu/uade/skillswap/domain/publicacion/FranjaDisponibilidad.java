@@ -30,6 +30,16 @@ public final class FranjaDisponibilidad {
         this.reservados = 0;
     }
 
+    /** Vuelve a armar una franja guardada con los lugares que ya tenía reservados. Lo usan los repositorios. */
+    public static FranjaDisponibilidad reconstruir(FranjaId id, Instant inicio, Instant fin, int reservados) {
+        if (reservados < 0) {
+            throw new IllegalArgumentException("Los lugares reservados no pueden ser negativos: " + reservados);
+        }
+        var franja = new FranjaDisponibilidad(id, inicio, fin);
+        franja.reservados = reservados;
+        return franja;
+    }
+
     /** Los intervalos son semiabiertos [inicio, fin): dos franjas contiguas no se solapan. */
     boolean seSolapaCon(FranjaDisponibilidad otra) {
         return inicio.isBefore(otra.fin) && otra.inicio.isBefore(fin);
