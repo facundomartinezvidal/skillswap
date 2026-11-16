@@ -34,8 +34,8 @@ ar.edu.uade.skillswap
 │   ├── memoria/             # Repositorios, buscador y unidad de trabajo en memoria (tests y demo sin MySQL)
 │   ├── notificacion/        # Patrón Adapter: EmailAdapter y PushAdapter sobre proveedores simulados
 │   ├── identidad/           # ServicioIdentidadSimulado
-│   └── configuracion/       # BackendEnMemoria: composition root sin Spring
-│                            # (pendiente: JPA y Flyway, del equipo de persistencia)
+│   ├── persistencia/        # JPA y MySQL: entidades, mappers, repositorios, buscador, UnidadDeTrabajoJpa, Flyway
+│   └── configuracion/       # BackendEnMemoria y BackendJpa: composition roots sin Spring
 ├── controllers/             # Contrato actual de la UI Swing
 ├── model/                   # Modelos de vista existentes
 ├── mock/                    # Implementación de demostración existente
@@ -240,6 +240,30 @@ perfil. Un suscriptor que falla no deshace la operación ni corta a los demás.
   esas reglas en el dominio.
 - Limitación conocida: `findPublicadas()` no tiene límite (las recomendaciones
   cargan todas las publicadas).
+
+## Persistencia (JPA y MySQL)
+
+- **Esquema:** lo define solo Flyway (`V1__esquema_inicial.sql`); Hibernate corre con
+  `hbm2ddl.auto=validate`, así que si una entidad no coincide con la tabla la app no arranca.
+  `Migraciones` corre Flyway al construir `BackendJpa`. La Wallet de garantía la inserta la migración.
+- **Entidades** solo en `infrastructure/persistencia/<módulo>`, una por tabla (las colecciones de textos,
+  como etiquetas y habilidades, son `@ElementCollection`). Un mapper por agregado arma el dominio con
+  `reconstruir(...)` y los estados se guardan por nombre (`"PUBLICADA"`).
+- **Transacciones:** `UnidadDeTrabajoJpa` abre un `EntityManager` por transacción (en un `ThreadLocal`),
+  hace `begin`/`commit` y `rollback` si algo falla. Los repositorios usan ese `EntityManager`; fuera de
+  una transacción, cada llamada abre una transacción corta propia.
+- **Concurrencia (caso 4):** `@Version` en publicación, wallet, contratación y perfil. Guardar una
+  publicación siempre sube su versión (`OPTIMISTIC_FORCE_INCREMENT`), aunque solo cambie el cupo de una
+  franja: de dos aceptaciones simultáneas sobre el último lugar, la segunda falla al confirmar y se
+  traduce a `ConflictoDeConcurrenciaException`.
+- **Unicidad:** `UNIQUE(contratacion_id, titular_id, tipo)` en movimientos impide el doble cobro, y
+  `UNIQUE(contratacion_id, autor_id)` en calificaciones, la calificación duplicada.
+- **Denormalizaciones:** `publicaciones.precio_final` (con promociones) y `publicada_en` se calculan con
+  el dominio al guardar, para filtrar y ordenar la búsqueda en SQL.
+- **Sin N+1:** los listados buscan primero los ids de la página (con una consulta de `count` para el
+  total) y después cargan ese lote con una consulta `join fetch` por colección.
+- **MySQL local:** `docker compose up -d` levanta MySQL 8 en el puerto 3307 (usuario y contraseña de
+  desarrollo `skillswap`). `DB_URL`, `DB_USER` y `DB_PASSWORD` cambian la conexión.
 
 ## Patrones
 

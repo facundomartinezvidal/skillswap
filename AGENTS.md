@@ -65,12 +65,14 @@ src/main/java/ar/edu/uade/skillswap/
 ├── domain/                            # Dominio Java puro (completo), con los puertos de repositorio
 ├── application/                       # Casos de uso: un Service por flujo, DTOs y puertos (ver docs/arquitectura.md)
 ├── infrastructure/                    # memoria/ (repos y unidad de trabajo en memoria), notificacion/ (adapters),
-│                                      # identidad/ (simulada), configuracion/BackendEnMemoria (composition root)
+│                                      # identidad/ (simulada), persistencia/ (JPA: entidades, mappers, repositorios,
+│                                      # UnidadDeTrabajoJpa, Migraciones), configuracion/BackendEnMemoria y BackendJpa
 ├── controllers/UiControllers.java     # CONTRATO entre la UI y el backend (interfaces de controllers)
 ├── mock/MockSkillSwapControllers.java # implementación en memoria con datos de demo
 ├── model/Models.java                  # records/enums que viajan entre la UI y los controllers
 └── ui/                                # SkillSwapView (pantallas) y Theme (colores y fuentes)
-src/main/resources/db/migration/V1__esquema_inicial.sql   # esquema inicial (todavía no alineado con el dominio)
+src/main/resources/db/migration/V1__esquema_inicial.sql   # esquema Flyway, alineado con el dominio
+docker-compose.yml                                        # MySQL 8 de desarrollo (puerto 3307, skillswap/skillswap)
 src/test/java/ar/edu/uade/skillswap/
 ├── ArquitecturaTest.java              # reglas de dependencias de domain y application
 ├── RecorridoCompletoTest.java         # la demo de punta a punta con BackendEnMemoria
@@ -82,8 +84,8 @@ src/test/java/ar/edu/uade/skillswap/
 - `Models` son **modelos de vista** (records inmutables): `Perfil`, `Publicacion`, `Contratacion`, `Movimiento`, `Notificacion`, `FiltrosBusqueda` y los enums `Modalidad`, `EstadoPublicacion` y `EstadoContratacion`. **No** son entidades de dominio ni entidades JPA, y no deben tener lógica de negocio.
 - `Modalidad` tiene `HIBRIDA` además de `REMOTA` y `PRESENCIAL`, aunque la consigna solo menciona remota y presencial.
 - El usuario activo está hardcodeado en la UI (`USER_ID = "user-mateo"`), simulando el login mock. `ServicioIdentidadSimulado` lo conoce.
-- **El dominio y la capa de aplicación están completos** (PRs #12 a #18). **Todavía no existen** la persistencia JPA (`persistence.xml`, entidades, repositorios JPA) ni los controllers reales: la UI sigue usando el mock. Mientras tanto, `BackendEnMemoria` arma todos los Services con la implementación en memoria.
-- `mvn test` corre 495 tests. El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md).
+- **El dominio y la capa de aplicación están completos** (PRs #12 a #18). La **persistencia JPA** está en `infrastructure/persistencia` y `BackendJpa` arma los mismos Services que `BackendEnMemoria` contra MySQL (`DB_URL`, `DB_USER`, `DB_PASSWORD`; por defecto el MySQL del `docker-compose.yml`). **Todavía no existen** los controllers reales: la UI sigue usando el mock.
+- `mvn test` corre 522 tests. Los 24 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y quedan deshabilitados si Docker no está disponible. El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ### Decisiones de dominio acordadas
 
