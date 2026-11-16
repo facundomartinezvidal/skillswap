@@ -12,13 +12,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
  * Repositorio de contrataciones en memoria, para tests y para la demo sin base de datos.
  * Guarda y devuelve copias, como una base: cambiar lo que devuelve {@code findById} no cambia
- * lo guardado hasta que se llama a {@code save}.
+ * lo guardado hasta que se llama a {@code save}. Los {@code save} pasan por la {@link UnidadDeTrabajoEnMemoria}.
  */
 public class ContratacionRepositoryEnMemoria implements ContratacionRepository {
 
@@ -27,6 +28,11 @@ public class ContratacionRepositoryEnMemoria implements ContratacionRepository {
 
     /** En orden de creación; los listados las devuelven de la más nueva a la más vieja. */
     private final Map<ContratacionId, Contratacion> contrataciones = new LinkedHashMap<>();
+    private final UnidadDeTrabajoEnMemoria unidadDeTrabajo;
+
+    public ContratacionRepositoryEnMemoria(UnidadDeTrabajoEnMemoria unidadDeTrabajo) {
+        this.unidadDeTrabajo = Objects.requireNonNull(unidadDeTrabajo);
+    }
 
     @Override
     public Optional<Contratacion> findById(ContratacionId id) {
@@ -35,7 +41,8 @@ public class ContratacionRepositoryEnMemoria implements ContratacionRepository {
 
     @Override
     public void save(Contratacion contratacion) {
-        contrataciones.put(contratacion.id(), copiar(contratacion));
+        var copia = copiar(contratacion);
+        unidadDeTrabajo.registrar(() -> contrataciones.put(copia.id(), copia));
     }
 
     @Override

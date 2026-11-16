@@ -5,15 +5,21 @@ import ar.edu.uade.skillswap.domain.perfil.PerfilRepository;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
  * Repositorio de perfiles en memoria, para tests y para la demo sin base de datos.
- * Guarda y devuelve copias, como una base.
+ * Guarda y devuelve copias, como una base. Los {@code save} pasan por la {@link UnidadDeTrabajoEnMemoria}.
  */
 public class PerfilRepositoryEnMemoria implements PerfilRepository {
 
     private final Map<String, Perfil> perfiles = new HashMap<>();
+    private final UnidadDeTrabajoEnMemoria unidadDeTrabajo;
+
+    public PerfilRepositoryEnMemoria(UnidadDeTrabajoEnMemoria unidadDeTrabajo) {
+        this.unidadDeTrabajo = Objects.requireNonNull(unidadDeTrabajo);
+    }
 
     @Override
     public Optional<Perfil> findByUserId(String userId) {
@@ -22,7 +28,8 @@ public class PerfilRepositoryEnMemoria implements PerfilRepository {
 
     @Override
     public void save(Perfil perfil) {
-        perfiles.put(perfil.userId(), copiar(perfil));
+        var copia = copiar(perfil);
+        unidadDeTrabajo.registrar(() -> perfiles.put(copia.userId(), copia));
     }
 
     private static Perfil copiar(Perfil p) {
