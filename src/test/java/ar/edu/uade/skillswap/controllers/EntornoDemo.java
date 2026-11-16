@@ -9,9 +9,7 @@ import ar.edu.uade.skillswap.model.Models.Contratacion;
 import ar.edu.uade.skillswap.model.Models.Modalidad;
 import ar.edu.uade.skillswap.model.Models.Publicacion;
 
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 
 import static ar.edu.uade.skillswap.model.Models.EstadoPublicacion.PUBLICADA;
 
@@ -26,7 +24,7 @@ final class EntornoDemo {
     static final String ANA = DatosDemo.ANA;
     static final String LUCIA = DatosDemo.LUCIA;
 
-    final Clock clock = Clock.fixed(AHORA, ZoneOffset.UTC);
+    final RelojDePrueba clock = new RelojDePrueba(AHORA);
     final BackendEnMemoria backend = new BackendEnMemoria(clock, ServicioIdentidadSimulado.conUsuariosDeDemo(),
             BackendEnMemoria.BONO_DEMO, AfinidadPorHabilidades::new);
     final DatosDemo datosDemo = new DatosDemo(backend.perfilService, backend.publicacionService,
