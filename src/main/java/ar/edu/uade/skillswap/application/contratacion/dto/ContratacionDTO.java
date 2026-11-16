@@ -11,4 +11,9 @@ public record ContratacionDTO(String id, String publicacionId, String tituloPubl
                               String proveedorId, String franjaId, Instant inicioSesion, long precioAcordado,
                               String estado, PropuestaReprogramacionDTO propuesta, ReintegroDTO reintegro,
                               List<CambioEstadoDTO> historial, List<CalificacionDTO> calificaciones) {
+
+    public ContratacionDTO {
+        historial = List.copyOf(historial);
+        calificaciones = List.copyOf(calificaciones);
+    }
 }

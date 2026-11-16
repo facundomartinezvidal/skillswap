@@ -17,4 +17,10 @@ public record PublicacionDTO(String id, String autorId, String autorNombre, doub
                              Modalidad modalidad, Duration duracionEstimada, int cupo, Long precioBase,
                              Long precioFinal, Set<String> etiquetas, String estado, String motivoCancelacion,
                              List<FranjaDTO> franjas, List<PromocionDTO> promociones) {
+
+    public PublicacionDTO {
+        etiquetas = Set.copyOf(etiquetas);
+        franjas = List.copyOf(franjas);
+        promociones = List.copyOf(promociones);
+    }
 }

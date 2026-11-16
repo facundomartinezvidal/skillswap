@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.application.notificacion;
 
 import ar.edu.uade.skillswap.application.notificacion.dto.NotificacionDTO;
+import ar.edu.uade.skillswap.application.shared.UnidadDeTrabajo;
 import ar.edu.uade.skillswap.domain.notificacion.NotificacionRepository;
 import ar.edu.uade.skillswap.domain.shared.Pagina;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
@@ -11,9 +12,11 @@ import java.util.Objects;
 public class NotificacionService {
 
     private final NotificacionRepository notificacionRepository;
+    private final UnidadDeTrabajo unidadDeTrabajo;
 
-    public NotificacionService(NotificacionRepository notificacionRepository) {
+    public NotificacionService(NotificacionRepository notificacionRepository, UnidadDeTrabajo unidadDeTrabajo) {
         this.notificacionRepository = Objects.requireNonNull(notificacionRepository);
+        this.unidadDeTrabajo = Objects.requireNonNull(unidadDeTrabajo);
     }
 
     public Pagina<NotificacionDTO> listar(String userId, PaginaSolicitada pagina) {
@@ -24,6 +27,7 @@ public class NotificacionService {
         throw pendiente();
     }
 
+    /** Marca todas en una transacción: o quedan todas leídas o ninguna. */
     public void marcarTodasLeidas(String userId) {
         throw pendiente();
     }

@@ -16,4 +16,11 @@ public record PerfilDTO(String userId, TipoPerfil tipo, String nombreVisible, St
                         Set<String> habilidades, Set<String> intereses, List<DisponibilidadDTO> disponibilidad,
                         CanalNotificacion canal, double reputacion, int cantidadCalificaciones,
                         long contratacionesCompletadas, List<PublicacionDTO> publicacionesActivas, boolean activo) {
+
+    public PerfilDTO {
+        habilidades = Set.copyOf(habilidades);
+        intereses = Set.copyOf(intereses);
+        disponibilidad = List.copyOf(disponibilidad);
+        publicacionesActivas = List.copyOf(publicacionesActivas);
+    }
 }

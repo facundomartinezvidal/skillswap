@@ -117,6 +117,6 @@ public class ContratacionService {
     }
 
     private static UnsupportedOperationException pendiente() {
-        return new UnsupportedOperationException("Pendiente: se implementa en el PR 2");
+        return new UnsupportedOperationException("Pendiente: se implementa en un PR siguiente");
     }
 }

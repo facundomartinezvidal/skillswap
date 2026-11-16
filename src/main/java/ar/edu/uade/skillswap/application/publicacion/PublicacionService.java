@@ -29,7 +29,11 @@ public class PublicacionService {
         this.clock = Objects.requireNonNull(clock);
     }
 
-    /** Crea el borrador. El tipo sale del perfil del autor: un profesional publica ofertas y una organización, desafíos. */
+    /**
+     * Crea el borrador. El tipo sale del perfil del autor: un profesional publica ofertas y una
+     * organización, desafíos. Como el tipo de perfil no cambia, la publicación siempre coincide con su
+     * autor y {@link #publicar} no necesita volver a validarlo.
+     */
     public PublicacionDTO crearBorrador(String userId, DatosPublicacionCommand datos) {
         throw pendiente();
     }
@@ -42,7 +46,6 @@ public class PublicacionService {
         throw pendiente();
     }
 
-    /** Valida además que el tipo de perfil del autor coincida con el tipo de publicación. */
     public PublicacionDTO publicar(String userId, String publicacionId) {
         throw pendiente();
     }
@@ -76,8 +79,11 @@ public class PublicacionService {
         throw pendiente();
     }
 
-    /** Detalle con franjas y lugares libres, para elegir al solicitar. */
-    public PublicacionDTO verPublicacion(String publicacionId) {
+    /**
+     * Detalle con franjas y lugares libres, para elegir al solicitar. Un BORRADOR o una PAUSADA solo
+     * la ve su autor; para los demás es como si no existiera.
+     */
+    public PublicacionDTO verPublicacion(String userId, String publicacionId) {
         throw pendiente();
     }
 
