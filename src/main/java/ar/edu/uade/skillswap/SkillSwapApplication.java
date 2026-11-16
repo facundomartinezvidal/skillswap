@@ -11,6 +11,8 @@ import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
 import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.controllers.impl.SkillSwapControllers;
 import ar.edu.uade.skillswap.infrastructure.configuracion.BackendEnMemoria;
+import ar.edu.uade.skillswap.infrastructure.configuracion.BackendJpa;
+import ar.edu.uade.skillswap.infrastructure.persistencia.ConfiguracionBaseDeDatos;
 import ar.edu.uade.skillswap.infrastructure.configuracion.DatosDemo;
 import ar.edu.uade.skillswap.infrastructure.identidad.ServicioIdentidadSimulado;
 import ar.edu.uade.skillswap.ui.SkillSwapView;
@@ -63,7 +65,16 @@ public final class SkillSwapApplication {
         if (argumentos.contains("--memoria")) {
             return conBackendEnMemoria(clock);
         }
-        return conBackendEnMemoria(clock); // TODO integración: BackendJpa
+        return conBackendJpa(clock);
+    }
+
+    /** MySQL según {@code DB_URL}, {@code DB_USER} y {@code DB_PASSWORD}; corre las migraciones de Flyway al arrancar. */
+    private static SkillSwapControllers conBackendJpa(Clock clock) {
+        var backend = new BackendJpa(ConfiguracionBaseDeDatos.desdeEntorno(), clock,
+                ServicioIdentidadSimulado.conUsuariosDeDemo(), BackendEnMemoria.BONO_DEMO, AfinidadPorHabilidades::new);
+        Runtime.getRuntime().addShutdownHook(new Thread(backend::close));
+        return armar(backend.perfilService, backend.publicacionService, backend.busquedaService,
+                backend.contratacionService, backend.walletService, backend.notificacionService, clock);
     }
 
     private static SkillSwapControllers conBackendEnMemoria(Clock clock) {
