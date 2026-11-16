@@ -124,6 +124,18 @@ class PublicacionServiceTest {
         }
 
         @Test
+        void conElPerfilDadoDeBajaNoSeReanuda() {
+            var publicacion = publicada();
+            service.pausar(ANA, publicacion.id(), "vacaciones");
+            var ana = perfiles.findByUserId(ANA).orElseThrow();
+            ana.darDeBaja(ANA, "me voy", AHORA);
+            perfiles.save(ana);
+
+            assertThrows(PerfilInactivoException.class, () -> service.reanudar(ANA, publicacion.id()));
+            assertEquals("PAUSADA", estadoGuardado(publicacion));
+        }
+
+        @Test
         void unaPublicacionPublicadaNoSeEdita() {
             var publicacion = publicada();
 
@@ -233,6 +245,13 @@ class PublicacionServiceTest {
 
             assertThrows(IllegalArgumentException.class, () -> service.agregarPromocion(ANA, publicacion.id(),
                     new PromocionDTO(PromocionDTO.Tipo.PORCENTUAL, 150)));
+        }
+
+        @Test
+        void unaPromocionSinTipoOConUnPorcentajeEnormeSeRechazaConMensaje() {
+            assertThrows(IllegalArgumentException.class, () -> new PromocionDTO(null, 10));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new PromocionDTO(PromocionDTO.Tipo.PORCENTUAL, Long.MAX_VALUE));
         }
     }
 
