@@ -5,7 +5,9 @@ import ar.edu.uade.skillswap.application.notificacion.dto.NotificacionDTO;
 import ar.edu.uade.skillswap.application.perfil.dto.PerfilDTO;
 import ar.edu.uade.skillswap.application.publicacion.dto.PublicacionDTO;
 import ar.edu.uade.skillswap.application.wallet.dto.MovimientoDTO;
+import ar.edu.uade.skillswap.controllers.PaginaVista;
 import ar.edu.uade.skillswap.domain.perfil.TipoPerfil;
+import ar.edu.uade.skillswap.domain.shared.Pagina;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models;
 
@@ -13,6 +15,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Objects;
+import java.util.function.Function;
 
 /** Pasa los DTOs de la aplicación a los modelos de vista de la cátedra ({@link Models}) y viceversa. */
 final class ModelosMapper {
@@ -21,12 +24,19 @@ final class ModelosMapper {
      * La UI de la cátedra no pagina: todos los listados piden la primera página de este tamaño, que
      * alcanza de sobra para la demo.
      */
-    static final PaginaSolicitada PRIMERA_PAGINA = PaginaSolicitada.primera(50);
+    static final int TAMANIO_UI = 50;
+    static final PaginaSolicitada PRIMERA_PAGINA = PaginaSolicitada.primera(TAMANIO_UI);
 
     /** Las fechas se guardan como Instant; la UI las muestra en la hora local de la máquina. */
     static final ZoneId ZONA = ZoneId.systemDefault();
 
     private ModelosMapper() {
+    }
+
+    /** Una página de DTOs como página de modelos de vista, con el mismo número, tamaño y total. */
+    static <D, M> PaginaVista<M> aVista(Pagina<D> pagina, Function<D, M> aModelo) {
+        return new PaginaVista<>(pagina.elementos().stream().map(aModelo).toList(), pagina.numero(),
+                pagina.tamanio(), pagina.total());
     }
 
     static Models.Publicacion aModelo(PublicacionDTO p) {

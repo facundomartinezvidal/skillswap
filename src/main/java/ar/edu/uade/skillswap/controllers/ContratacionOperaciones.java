@@ -8,6 +8,9 @@ import ar.edu.uade.skillswap.model.Models.Contratacion;
  */
 public interface ContratacionOperaciones {
 
+    /** Las contrataciones como cliente o proveedor, de la más nueva a la más vieja. */
+    PaginaVista<Contratacion> listarContrataciones(String userId, int pagina, int tamanio);
+
     Contratacion aceptar(String userId, String contratacionId);
 
     Contratacion rechazar(String userId, String contratacionId, String motivo);

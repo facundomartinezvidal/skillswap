@@ -3,8 +3,11 @@ package ar.edu.uade.skillswap.controllers.impl;
 import ar.edu.uade.skillswap.application.busqueda.BusquedaService;
 import ar.edu.uade.skillswap.application.busqueda.CriteriosBusqueda;
 import ar.edu.uade.skillswap.application.busqueda.OrdenBusqueda;
+import ar.edu.uade.skillswap.controllers.BusquedaOperaciones;
+import ar.edu.uade.skillswap.controllers.PaginaVista;
 import ar.edu.uade.skillswap.controllers.RecomendacionController;
 import ar.edu.uade.skillswap.controllers.UiControllers;
+import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.FiltrosBusqueda;
 import ar.edu.uade.skillswap.model.Models.Publicacion;
 
@@ -14,7 +17,7 @@ import java.util.Objects;
 
 import static ar.edu.uade.skillswap.controllers.impl.ManejoDeErrores.ejecutar;
 
-public class BusquedaControllerImpl implements UiControllers.BusquedaController {
+public class BusquedaControllerImpl implements UiControllers.BusquedaController, BusquedaOperaciones {
 
     /** Opción del combo de categorías de la UI que significa "sin filtrar". */
     static final String TODAS = "Todas";
@@ -33,6 +36,13 @@ public class BusquedaControllerImpl implements UiControllers.BusquedaController 
                 .elementos().stream()
                 .map(ModelosMapper::aModelo)
                 .toList());
+    }
+
+    @Override
+    public PaginaVista<Publicacion> buscar(Criterios criterios, int pagina, int tamanio) {
+        return ejecutar(() -> ModelosMapper.aVista(
+                busquedaService.buscar(aCriterios(criterios), new PaginaSolicitada(pagina, tamanio)),
+                ModelosMapper::aModelo));
     }
 
     /** La pantalla de inicio pide las recomendaciones a la búsqueda; las resuelve el RecomendacionController. */
@@ -62,6 +72,20 @@ public class BusquedaControllerImpl implements UiControllers.BusquedaController 
         var precioMaximo = f.precioMaximo() > 0 ? Long.valueOf(f.precioMaximo()) : null;
         return new CriteriosBusqueda(texto, categoria, ModelosMapper.aDominio(f.modalidad()), null, precioMaximo,
                 null, null, aOrden(f.orden()));
+    }
+
+    /** Los criterios completos solo cambian de tipos: precios a long y el orden por nombre. Sin criterios, no filtra. */
+    static CriteriosBusqueda aCriterios(Criterios c) {
+        if (c == null) {
+            return new CriteriosBusqueda(null, null, null, null, null, null, null, null);
+        }
+        var orden = c.orden() == null ? null : OrdenBusqueda.valueOf(c.orden().name());
+        return new CriteriosBusqueda(c.texto(), c.categoria(), ModelosMapper.aDominio(c.modalidad()),
+                aLong(c.precioMinimo()), aLong(c.precioMaximo()), c.habilidad(), c.reputacionMinima(), orden);
+    }
+
+    private static Long aLong(Integer valor) {
+        return valor == null ? null : valor.longValue();
     }
 
     /** Los textos del combo de orden de la UI. Cualquier otro valor ordena por relevancia. */

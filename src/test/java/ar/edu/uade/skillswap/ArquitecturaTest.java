@@ -67,6 +67,7 @@ class ArquitecturaTest {
     /** Del dominio, los controllers solo usan tipos simples: enums, la excepción base y la página pedida. */
     private static final Set<String> DOMINIO_PERMITIDO_EN_CONTROLLERS = Set.of(
             "ar.edu.uade.skillswap.domain.shared.DomainException",
+            "ar.edu.uade.skillswap.domain.shared.Pagina",
             "ar.edu.uade.skillswap.domain.shared.PaginaSolicitada",
             "ar.edu.uade.skillswap.domain.publicacion.Modalidad",
             "ar.edu.uade.skillswap.domain.perfil.TipoPerfil",

@@ -8,7 +8,9 @@ import ar.edu.uade.skillswap.application.publicacion.PublicacionService;
 import ar.edu.uade.skillswap.application.publicacion.dto.FranjaDTO;
 import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
+import ar.edu.uade.skillswap.controllers.PaginaVista;
 import ar.edu.uade.skillswap.controllers.UiControllers;
+import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.Contratacion;
 
 import java.time.Clock;
@@ -38,15 +40,20 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
         this.clock = Objects.requireNonNull(clock);
     }
 
+    /** La UI no pagina: ve la primera página. */
     @Override
     public List<Contratacion> listarContrataciones(String userId) {
+        return listarContrataciones(userId, 0, ModelosMapper.TAMANIO_UI).elementos();
+    }
+
+    @Override
+    public PaginaVista<Contratacion> listarContrataciones(String userId, int pagina, int tamanio) {
         return ejecutar(() -> {
             // Un mismo nombre aparece en varias filas: se busca una sola vez por persona.
             var nombres = new HashMap<String, String>();
-            return contratacionService.listarContrataciones(userId, ModelosMapper.PRIMERA_PAGINA)
-                    .elementos().stream()
-                    .map(c -> ModelosMapper.aModelo(c, nombreContraparte(userId, c, nombres)))
-                    .toList();
+            var contrataciones = contratacionService.listarContrataciones(userId, new PaginaSolicitada(pagina, tamanio));
+            return ModelosMapper.aVista(contrataciones,
+                    c -> ModelosMapper.aModelo(c, nombreContraparte(userId, c, nombres)));
         });
     }
 
