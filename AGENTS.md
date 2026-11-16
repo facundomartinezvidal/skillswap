@@ -104,10 +104,15 @@ Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y
 
 ### Próximo hito: capa de aplicación
 
-- Casos de uso que coordinan agregados en una transacción: pagar (`Contratacion.pagar` + `RetencionDePagos.retener`), completar (`completar` + `liberarAlProveedor`), cancelar (`cancelar` + `repartir`), calificar (`calificar` + `Perfil.registrarCalificacion`), solicitar con `publicacion.precioFinal()` y reserva de cupo, y publicar validando que el `TipoPerfil` coincida con el `TipoPublicacion`.
+- Casos de uso que coordinan agregados en una transacción: pagar (`Contratacion.pagar` + `RetencionDePagos.retener`), completar (`completar` + `liberarAlProveedor`), cancelar (`cancelar` + `repartir`), calificar (`calificar` + `Perfil.registrarCalificacion`), solicitar con `publicacion.precioFinal()` (el cupo se reserva al **aceptar**, no al solicitar, como pide la consigna), y crear el borrador con el `TipoPublicacion` que corresponde al `TipoPerfil` del autor (profesional → oferta, organización → desafío), así nunca pueden no coincidir.
 - Publicador de eventos y suscriptores (Observer), elección del canal según el perfil (Simple Factory) y adapters mock de email y push (Adapter), para cubrir el caso de aceptación 8.
 - Implementaciones en memoria de los repositorios para testear los casos de uso.
 - Pendientes de persistencia: alinear `V1` con el dominio (identidad por `userId`, Wallet de garantía sin perfil, tipo de perfil), reconstruir los agregados desde la base y bloqueo optimista sobre la fila de la garantía.
+
+### Capa de aplicación: acuerdos
+
+- Las firmas de los Services y los puertos (PR #12) son el contrato para persistencia y controllers. Mientras un Service lance `UnsupportedOperationException("Pendiente…")`, **ningún controller lo usa**: se conecta recién cuando su PR de implementación está mergeado.
+- **Limitación conocida:** `PublicacionRepository.findPublicadas()` no tiene límite (las recomendaciones cargan todas las publicadas). Alcanza para el volumen del TP; con muchos datos, habría que acotar las candidatas en la consulta.
 
 ### Qué le falta al contrato actual respecto de la consigna
 
@@ -131,7 +136,7 @@ Si se cambia el contrato, hay que adaptar `MockSkillSwapControllers` y `SkillSwa
   - En español (lenguaje ubicuo de la consigna): entidades, value objects, estados, reglas y operaciones de negocio (`Publicacion`, `Contratacion`, `FranjaDisponibilidad`, `publicar`, `reservarCupo`, `CupoAgotadoException`), nombres de módulo de negocio (`publicacion`, `contratacion`), nombres de tests que describen comportamiento y mensajes que ve el usuario.
   - En inglés: capas y paquetes técnicos (`domain`, `application`, `infrastructure`, `shared`), sufijos y roles técnicos (`Repository`, `Mapper`, `Exception`, `UseCase`), métodos técnicos (`findById`, `save`, `generate`) y helpers privados sin significado de negocio.
   - El código entregado por la cátedra (`controllers`, `model`, `ui`, `mock` y sus tipos) no se renombra.
-- Estructura de paquetes: primero la capa, después el módulo de negocio (`domain/publicacion`, `application/publicacion`, `infrastructure/publicacion`). Lo compartido entre módulos va en `domain/shared` (solo value objects y la excepción base). Un módulo referencia a otro solo por ids; la coordinación entre módulos va en `application`.
+- Estructura de paquetes: primero la capa, después el módulo de negocio (`domain/publicacion`, `application/publicacion`, `infrastructure/publicacion`). Lo compartido entre módulos va en `domain/shared`: value objects, la excepción base y `Pagina`/`PaginaSolicitada`, que devuelven los puertos de repositorio del dominio para paginar los listados. Un módulo referencia a otro solo por ids; la coordinación entre módulos va en `application`.
 - Dentro de cada módulo de dominio: la raíz del agregado, sus entidades internas, los value objects y el puerto del repositorio van en la raíz del módulo. Las implementaciones de patrones y las excepciones van en subpaquetes: `state` (la interfaz sellada y sus estados juntos, porque Java exige el mismo paquete), `strategy` (la interfaz y sus estrategias), `decorator` (el componente, el decorador y lo que decora), `evento` (los eventos de dominio que emite el agregado) y `exception`. Ejemplo: `domain/publicacion/state/EstadoPublicacion.java`.
 - Paquete base: `ar.edu.uade.skillswap`.
 - Preferir `record` para value objects y DTOs inmutables.

@@ -12,8 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regla de dependencias: el dominio es Java puro. No conoce la UI, los controllers, el mock,
- * los modelos de vista, JPA ni Swing. Se revisa el texto de cada fuente para detectar tanto
+ * Regla de dependencias: el dominio es Java puro. No conoce la aplicación, la UI, los controllers,
+ * el mock, los modelos de vista, JPA ni Swing. La aplicación solo conoce al dominio: tampoco depende
+ * de la infraestructura ni de la presentación. Se revisa el texto de cada fuente para detectar tanto
  * imports como nombres completamente calificados.
  */
 class ArquitecturaTest {
@@ -21,12 +22,26 @@ class ArquitecturaTest {
     private static final Path MAIN = Path.of("src/main/java/ar/edu/uade/skillswap");
 
     private static final List<String> PROHIBIDOS_EN_DOMAIN = List.of(
+            "ar.edu.uade.skillswap.application.",
+            "ar.edu.uade.skillswap.infrastructure.",
             "ar.edu.uade.skillswap.controllers.",
             "ar.edu.uade.skillswap.ui.",
             "ar.edu.uade.skillswap.mock.",
             "ar.edu.uade.skillswap.model.",
             "jakarta.persistence.",
             "javax.persistence.",
+            "javax.swing.");
+
+    private static final List<String> PROHIBIDOS_EN_APPLICATION = List.of(
+            "ar.edu.uade.skillswap.infrastructure.",
+            "ar.edu.uade.skillswap.controllers.",
+            "ar.edu.uade.skillswap.ui.",
+            "ar.edu.uade.skillswap.mock.",
+            "ar.edu.uade.skillswap.model.",
+            "jakarta.persistence.",
+            "javax.persistence.",
+            "org.hibernate.",
+            "java.sql.",
             "javax.swing.");
 
     /** Notificación es genérica: conoce los eventos solo por {@code domain/shared/EventoDominio}. */
@@ -37,6 +52,24 @@ class ArquitecturaTest {
     @Test
     void elDominioNoDependeDeUiControllersMockModelJpaNiSwing() throws IOException {
         var violaciones = violaciones(MAIN.resolve("domain"), PROHIBIDOS_EN_DOMAIN);
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
+    @Test
+    void laAplicacionSoloDependeDelDominio() throws IOException {
+        var violaciones = violaciones(MAIN.resolve("application"), PROHIBIDOS_EN_APPLICATION);
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
+    /**
+     * Los {@code reconstruir(...)} del dominio arman un agregado en cualquier estado sin pasar por sus
+     * transiciones. Solo los usan los repositorios (infraestructura); la aplicación usa las operaciones.
+     */
+    @Test
+    void laAplicacionNoReconstruyeAgregados() throws IOException {
+        var violaciones = violaciones(MAIN.resolve("application"), List.of(".reconstruir("));
 
         assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
     }
