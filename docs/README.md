@@ -24,3 +24,4 @@ Transcripción de `tpo-consignas.pdf` (no se versiona; cada integrante lo tiene 
 | [diagramas.md](diagramas.md) | Diagramas de clases en Mermaid |
 | [demo.md](demo.md) | Guion de la demo |
 | [plan-de-trabajo.md](plan-de-trabajo.md) | Estado por hito y PRs |
+| [pendientes-equipo.md](pendientes-equipo.md) | Lo que falta o se puede mejorar según la revisión contra la consigna: botón Calificar, bug de RECHAZADA, StarUML, historias e informe PDF |

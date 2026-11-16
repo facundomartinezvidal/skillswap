@@ -94,6 +94,8 @@ src/test/java/ar/edu/uade/skillswap/
 - **El backend está completo** (PRs #12 a #24, encadenados): dominio, aplicación, persistencia JPA (`BackendJpa` contra MySQL con `DB_URL`, `DB_USER`, `DB_PASSWORD`; por defecto el MySQL del `docker-compose.yml`), controllers reales y la UI conectada. Sin argumentos la app usa MySQL; con `--memoria`, `BackendEnMemoria`. En los dos casos `DatosDemo` carga la demo una sola vez.
 - `mvn test` corre 564 tests. Los 24 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y quedan deshabilitados si Docker no está disponible. Cobertura de dominio + aplicación: 99,4 % de líneas y 95,3 % de ramas (JaCoCo). El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md) y las decisiones en [`docs/informe-decisiones.md`](docs/informe-decisiones.md).
 
+- **Pendientes:** lo que falta según la revisión contra la consigna (botón Calificar en la UI, bug de las contrataciones RECHAZADAS, orden "Más reciente", diagrama en StarUML, historias de usuario e informe en PDF) está en [`docs/pendientes-equipo.md`](docs/pendientes-equipo.md).
+
 ### Decisiones de dominio acordadas
 
 Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y cubiertas por tests.
