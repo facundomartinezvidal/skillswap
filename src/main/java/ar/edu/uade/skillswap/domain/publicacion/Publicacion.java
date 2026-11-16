@@ -4,6 +4,7 @@ import ar.edu.uade.skillswap.domain.publicacion.decorator.Precio;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.PrecioBase;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.PrecioConPromocion;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.Promocion;
+import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.FranjaInvalidaException;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
 import ar.edu.uade.skillswap.domain.publicacion.state.Borrador;
@@ -54,6 +55,37 @@ public final class Publicacion {
         }
         Objects.requireNonNull(tipo, "El tipo de publicación es obligatorio");
         return new Publicacion(PublicacionId.generate(), autorId, tipo);
+    }
+
+    /**
+     * Vuelve a armar una publicación guardada, en el estado en que quedó. Lo usan los repositorios
+     * (JPA o en memoria). No vuelve a validar reglas: los datos ya las cumplieron al guardarse.
+     */
+    public static Publicacion reconstruir(PublicacionId id, String autorId, TipoPublicacion tipo, String titulo,
+                                         String descripcion, String categoria, Modalidad modalidad,
+                                         Duration duracionEstimada, int cupo, SkillCoins precioBase,
+                                         Set<String> etiquetas, EstadoPublicacion estado, String motivoCancelacion,
+                                         List<FranjaDisponibilidad> franjas, List<Promocion> promociones,
+                                         List<CambioEstado> historial) {
+        Objects.requireNonNull(id, "El id de la publicación es obligatorio");
+        Objects.requireNonNull(autorId, "El autor de la publicación es obligatorio");
+        Objects.requireNonNull(tipo, "El tipo de publicación es obligatorio");
+        Objects.requireNonNull(estado, "El estado de la publicación es obligatorio");
+        var publicacion = new Publicacion(id, autorId, tipo);
+        publicacion.titulo = titulo;
+        publicacion.descripcion = descripcion;
+        publicacion.categoria = categoria;
+        publicacion.modalidad = modalidad;
+        publicacion.duracionEstimada = duracionEstimada;
+        publicacion.cupo = cupo;
+        publicacion.precioBase = precioBase;
+        publicacion.etiquetas = etiquetas == null ? Set.of() : Set.copyOf(etiquetas);
+        publicacion.estado = estado;
+        publicacion.motivoCancelacion = motivoCancelacion;
+        publicacion.franjas.addAll(franjas);
+        publicacion.promociones.addAll(promociones);
+        publicacion.historial.addAll(historial);
+        return publicacion;
     }
 
     /** Reemplaza el contenido editable. Solo en BORRADOR; los datos pueden quedar incompletos. */
@@ -114,6 +146,22 @@ public final class Publicacion {
 
     public boolean admiteSolicitudes() {
         return estado.admiteSolicitudes();
+    }
+
+    /**
+     * La franja elegida para solicitar o reprogramar. Falla si la publicación no admite solicitudes
+     * (regla 2), si la franja no es de esta publicación o si ya no tiene lugar (regla 3).
+     * No reserva: el cupo se toma recién cuando el proveedor acepta.
+     */
+    public FranjaDisponibilidad franjaDisponible(FranjaId franjaId) {
+        if (!admiteSolicitudes()) {
+            throw new TransicionInvalidaException(estado.nombre(), "solicitar");
+        }
+        var franja = findFranja(franjaId);
+        if (franja.estaOcupada(cupo)) {
+            throw new CupoAgotadoException(franjaId, cupo);
+        }
+        return franja;
     }
 
     /** Toma un lugar de la franja (el cupo es por franja). */
