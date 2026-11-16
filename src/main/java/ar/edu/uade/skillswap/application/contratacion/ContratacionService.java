@@ -4,27 +4,46 @@ import ar.edu.uade.skillswap.application.contratacion.dto.CalificacionDTO;
 import ar.edu.uade.skillswap.application.contratacion.dto.ContratacionDTO;
 import ar.edu.uade.skillswap.application.contratacion.dto.SolicitarContratacionCommand;
 import ar.edu.uade.skillswap.application.evento.PublicadorEventos;
+import ar.edu.uade.skillswap.application.shared.Ids;
 import ar.edu.uade.skillswap.application.shared.UnidadDeTrabajo;
+import ar.edu.uade.skillswap.application.shared.exception.PermisoDenegadoException;
+import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
+import ar.edu.uade.skillswap.domain.contratacion.Contratacion;
+import ar.edu.uade.skillswap.domain.contratacion.ContratacionId;
 import ar.edu.uade.skillswap.domain.contratacion.ContratacionRepository;
+import ar.edu.uade.skillswap.domain.contratacion.Solicitud;
 import ar.edu.uade.skillswap.domain.contratacion.strategy.PoliticaReintegroFactory;
 import ar.edu.uade.skillswap.domain.perfil.PerfilRepository;
+import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
+import ar.edu.uade.skillswap.domain.publicacion.Publicacion;
+import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionRepository;
 import ar.edu.uade.skillswap.domain.shared.Pagina;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
+import ar.edu.uade.skillswap.domain.shared.Puntaje;
 import ar.edu.uade.skillswap.domain.wallet.RetencionDePagos;
+import ar.edu.uade.skillswap.domain.wallet.Wallet;
 import ar.edu.uade.skillswap.domain.wallet.WalletRepository;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Casos de uso de la contratación: el recorrido solicitar, aceptar, pagar, iniciar, completar y
  * calificar, más rechazar, cancelar con reintegro y reprogramar. Lo usan el {@code ContratacionController}
  * y el {@code CalificacionController}.
+ * <p>
  * Coordina agregados que se conocen solo por id; las reglas viven en ellos. Las operaciones que tocan
- * más de un agregado son atómicas ({@link UnidadDeTrabajo}) y los eventos se publican después de confirmar.
+ * más de un agregado corren en una {@link UnidadDeTrabajo}: primero se modifican todos los agregados
+ * (cualquiera puede rechazar la operación) y recién al final se guardan. Los eventos se publican
+ * después de confirmar, así una operación rechazada no notifica a nadie.
  */
 public class ContratacionService {
+
+    /** Estados en los que la contratación tiene un lugar reservado en la franja (se reserva al aceptar). */
+    private static final Set<String> CON_CUPO_RESERVADO = Set.of("ACEPTADA", "CONFIRMADA");
 
     private final ContratacionRepository contratacionRepository;
     private final PublicacionRepository publicacionRepository;
@@ -52,71 +71,217 @@ public class ContratacionService {
         this.clock = Objects.requireNonNull(clock);
     }
 
-    /** Crea la contratación en PENDIENTE con el precio final de la publicación (con promociones). */
+    /**
+     * Crea la contratación en PENDIENTE con el precio final de la publicación (con promociones).
+     * La publicación valida que admita solicitudes y que la franja tenga lugar; el cupo se reserva al aceptar.
+     */
     public ContratacionDTO solicitar(SolicitarContratacionCommand command) {
-        throw pendiente();
+        var publicacion = buscarPublicacion(new PublicacionId(Ids.uuid("publicación", command.publicacionId())));
+        var franja = publicacion.franjaDisponible(new FranjaId(Ids.uuid("franja", command.franjaId())));
+        var solicitud = new Solicitud(command.mensaje(), command.objetivo(), franja.id());
+        var contratacion = Contratacion.solicitar(command.clienteId(), publicacion.autorId(), publicacion.id(),
+                solicitud, franja.inicio(), publicacion.precioFinal(), ahora());
+        contratacionRepository.save(contratacion);
+        publicarEventos(contratacion);
+        return ContratacionMapper.aDTO(contratacion, publicacion.titulo());
     }
 
     /** El proveedor acepta y se reserva el cupo de la franja, en una transacción. */
     public ContratacionDTO aceptar(String userId, String contratacionId) {
-        throw pendiente();
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            var publicacion = buscarPublicacion(c.publicacionId());
+            c.aceptar(userId, ahora());
+            publicacion.reservarCupo(c.franjaId());
+            publicacionRepository.save(publicacion);
+            contratacionRepository.save(c);
+            return c;
+        });
+        publicarEventos(contratacion);
+        return aDTO(contratacion);
     }
 
     public ContratacionDTO rechazar(String userId, String contratacionId, String motivo) {
-        throw pendiente();
-    }
-
-    /** El cliente paga: el precio queda retenido en la Wallet de garantía, en una transacción. */
-    public ContratacionDTO pagar(String userId, String contratacionId) {
-        throw pendiente();
-    }
-
-    public ContratacionDTO iniciar(String userId, String contratacionId) {
-        throw pendiente();
-    }
-
-    /** El proveedor completa y cobra lo retenido, en una transacción. */
-    public ContratacionDTO completar(String userId, String contratacionId) {
-        throw pendiente();
+        var contratacion = buscar(contratacionId);
+        contratacion.rechazar(userId, motivo, ahora());
+        contratacionRepository.save(contratacion);
+        return aDTO(contratacion);
     }
 
     /**
-     * Cancela aplicando la política de reintegro según quién cancela. Si estaba pagada reparte lo
-     * retenido y si tenía cupo reservado lo libera, en una transacción.
+     * El cliente paga: el precio pasa de su Wallet a la de garantía, en una transacción (regla 4).
+     * Un segundo pago lo rechaza el estado de la contratación, así que no hay doble cobro.
      */
-    public ContratacionDTO cancelar(String userId, String contratacionId, String motivo) {
-        throw pendiente();
+    public ContratacionDTO pagar(String userId, String contratacionId) {
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            c.pagar(userId, ahora());
+            if (c.precioAcordado().valor() > 0) {
+                var cliente = buscarWallet(c.clienteId());
+                var garantia = walletRepository.garantia();
+                retencionDePagos.retener(cliente, garantia, c.precioAcordado(), c.id(), ahora());
+                walletRepository.save(cliente);
+                walletRepository.save(garantia);
+            }
+            contratacionRepository.save(c);
+            return c;
+        });
+        publicarEventos(contratacion);
+        return aDTO(contratacion);
     }
 
+    public ContratacionDTO iniciar(String userId, String contratacionId) {
+        var contratacion = buscar(contratacionId);
+        contratacion.iniciar(userId, ahora());
+        contratacionRepository.save(contratacion);
+        return aDTO(contratacion);
+    }
+
+    /** El proveedor completa y cobra lo que estaba retenido en la garantía, en una transacción. */
+    public ContratacionDTO completar(String userId, String contratacionId) {
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            c.completar(userId, ahora());
+            if (c.precioAcordado().valor() > 0) {
+                var garantia = walletRepository.garantia();
+                var proveedor = buscarWallet(c.proveedorId());
+                retencionDePagos.liberarAlProveedor(garantia, proveedor, c.precioAcordado(), c.id(), ahora());
+                walletRepository.save(garantia);
+                walletRepository.save(proveedor);
+            }
+            contratacionRepository.save(c);
+            return c;
+        });
+        publicarEventos(contratacion);
+        return aDTO(contratacion);
+    }
+
+    /**
+     * Cancela con la política de reintegro que corresponde a quien cancela (Strategy elegida por la
+     * Simple Factory del dominio). Si estaba pagada, la garantía reparte lo retenido; si tenía cupo
+     * reservado, se libera. Todo en una transacción.
+     */
+    public ContratacionDTO cancelar(String userId, String contratacionId, String motivo) {
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            var teniaCupo = CON_CUPO_RESERVADO.contains(c.estado().nombre());
+            var politica = politicaReintegroFactory.paraCancelacion(c, userId);
+            var reintegro = c.cancelar(userId, motivo, politica, ahora());
+
+            var aRepartir = reintegro.alCliente().sumar(reintegro.alProveedor());
+            if (aRepartir.valor() > 0) {
+                var garantia = walletRepository.garantia();
+                var cliente = buscarWallet(c.clienteId());
+                var proveedor = buscarWallet(c.proveedorId());
+                retencionDePagos.repartir(garantia, cliente, proveedor, aRepartir, reintegro.alCliente(),
+                        reintegro.alProveedor(), c.id(), ahora());
+                walletRepository.save(garantia);
+                walletRepository.save(cliente);
+                walletRepository.save(proveedor);
+            }
+            if (teniaCupo) {
+                var publicacion = buscarPublicacion(c.publicacionId());
+                publicacion.liberarCupo(c.franjaId());
+                publicacionRepository.save(publicacion);
+            }
+            contratacionRepository.save(c);
+            return c;
+        });
+        publicarEventos(contratacion);
+        return aDTO(contratacion);
+    }
+
+    /** Propone otra franja de la misma publicación; tiene que tener lugar. Responde la otra parte. */
     public ContratacionDTO proponerReprogramacion(String userId, String contratacionId, String nuevaFranjaId) {
-        throw pendiente();
+        var contratacion = buscar(contratacionId);
+        var publicacion = buscarPublicacion(contratacion.publicacionId());
+        var franja = publicacion.franjaDisponible(new FranjaId(Ids.uuid("franja", nuevaFranjaId)));
+        contratacion.proponerReprogramacion(userId, franja.id(), franja.inicio(), ahora());
+        contratacionRepository.save(contratacion);
+        publicarEventos(contratacion);
+        return ContratacionMapper.aDTO(contratacion, publicacion.titulo());
     }
 
     /** Aplica la propuesta: reserva la franja nueva y libera la anterior, en una transacción. */
     public ContratacionDTO aceptarReprogramacion(String userId, String contratacionId) {
-        throw pendiente();
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            var publicacion = buscarPublicacion(c.publicacionId());
+            var anterior = c.aceptarReprogramacion(userId, ahora());
+            publicacion.reservarCupo(c.franjaId());
+            publicacion.liberarCupo(anterior);
+            publicacionRepository.save(publicacion);
+            contratacionRepository.save(c);
+            return c;
+        });
+        publicarEventos(contratacion);
+        return aDTO(contratacion);
     }
 
     public ContratacionDTO rechazarReprogramacion(String userId, String contratacionId) {
-        throw pendiente();
+        var contratacion = buscar(contratacionId);
+        contratacion.rechazarReprogramacion(userId, ahora());
+        contratacionRepository.save(contratacion);
+        return aDTO(contratacion);
     }
 
     /** Califica a la otra parte y suma el puntaje a su reputación, en una transacción. */
     public CalificacionDTO calificar(String userId, String contratacionId, int puntaje, String comentario) {
-        throw pendiente();
+        var calificacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            var nueva = c.calificar(userId, new Puntaje(puntaje), comentario, ahora());
+            var destinatario = perfilRepository.findByUserId(nueva.destinatarioId())
+                    .orElseThrow(() -> new RecursoNoEncontradoException("perfil", nueva.destinatarioId()));
+            destinatario.registrarCalificacion(nueva.puntaje());
+            perfilRepository.save(destinatario);
+            contratacionRepository.save(c);
+            return nueva;
+        });
+        return ContratacionMapper.aDTO(calificacion);
     }
 
-    /** Las contrataciones del usuario como cliente o como proveedor. */
+    /** Las contrataciones del usuario como cliente o como proveedor, de la más nueva a la más vieja. */
     public Pagina<ContratacionDTO> listarContrataciones(String userId, PaginaSolicitada pagina) {
-        throw pendiente();
+        return contratacionRepository.findByParticipante(userId, pagina).map(this::aDTO);
     }
 
     /** Detalle con historial y comprobante. Solo para los participantes. */
     public ContratacionDTO verContratacion(String userId, String contratacionId) {
-        throw pendiente();
+        var contratacion = buscar(contratacionId);
+        if (!contratacion.esParticipante(userId)) {
+            throw new PermisoDenegadoException(userId, "ver esta contratación");
+        }
+        return aDTO(contratacion);
     }
 
-    private static UnsupportedOperationException pendiente() {
-        return new UnsupportedOperationException("Pendiente: se implementa en un PR siguiente");
+    private Contratacion buscar(String contratacionId) {
+        var id = new ContratacionId(Ids.uuid("contratación", contratacionId));
+        return contratacionRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("contratación", contratacionId));
+    }
+
+    private Publicacion buscarPublicacion(PublicacionId id) {
+        return publicacionRepository.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("publicación", id.valor().toString()));
+    }
+
+    private Wallet buscarWallet(String titularId) {
+        return walletRepository.findByTitular(titularId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("wallet", titularId));
+    }
+
+    private void publicarEventos(Contratacion contratacion) {
+        publicadorEventos.publicar(contratacion.extraerEventos());
+    }
+
+    private ContratacionDTO aDTO(Contratacion contratacion) {
+        var titulo = publicacionRepository.findById(contratacion.publicacionId())
+                .map(Publicacion::titulo)
+                .orElse(null);
+        return ContratacionMapper.aDTO(contratacion, titulo);
+    }
+
+    private Instant ahora() {
+        return clock.instant();
     }
 }
