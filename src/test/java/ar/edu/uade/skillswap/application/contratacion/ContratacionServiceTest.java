@@ -5,7 +5,9 @@ import ar.edu.uade.skillswap.application.contratacion.dto.SolicitarContratacionC
 import ar.edu.uade.skillswap.application.evento.PublicadorEventos;
 import ar.edu.uade.skillswap.application.shared.exception.PermisoDenegadoException;
 import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
+import ar.edu.uade.skillswap.domain.contratacion.Contratacion;
 import ar.edu.uade.skillswap.domain.contratacion.ContratacionId;
+import ar.edu.uade.skillswap.domain.contratacion.Solicitud;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AccionNoPermitidaException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.AutoSolicitudException;
 import ar.edu.uade.skillswap.domain.contratacion.exception.CalificacionDuplicadaException;
@@ -13,9 +15,11 @@ import ar.edu.uade.skillswap.domain.contratacion.strategy.PoliticaReintegroFacto
 import ar.edu.uade.skillswap.domain.contratacion.strategy.ReintegroPorAnticipacion;
 import ar.edu.uade.skillswap.domain.perfil.Perfil;
 import ar.edu.uade.skillswap.domain.perfil.TipoPerfil;
+import ar.edu.uade.skillswap.domain.perfil.exception.PerfilInactivoException;
 import ar.edu.uade.skillswap.domain.publicacion.FranjaId;
 import ar.edu.uade.skillswap.domain.publicacion.Modalidad;
 import ar.edu.uade.skillswap.domain.publicacion.Publicacion;
+import ar.edu.uade.skillswap.domain.publicacion.PublicacionId;
 import ar.edu.uade.skillswap.domain.publicacion.TipoPublicacion;
 import ar.edu.uade.skillswap.domain.publicacion.decorator.DescuentoPorcentual;
 import ar.edu.uade.skillswap.domain.publicacion.exception.CupoAgotadoException;
@@ -62,16 +66,17 @@ class ContratacionServiceTest {
     private static final long PRECIO = 100;
     private static final long SALDO_INICIAL = 500;
 
-    private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria();
-    private final ContratacionRepositoryEnMemoria contrataciones = new ContratacionRepositoryEnMemoria();
-    private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria();
-    private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria();
+    private final UnidadDeTrabajoEnMemoria unidadDeTrabajo = new UnidadDeTrabajoEnMemoria();
+    private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria(unidadDeTrabajo);
+    private final ContratacionRepositoryEnMemoria contrataciones = new ContratacionRepositoryEnMemoria(unidadDeTrabajo);
+    private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria(unidadDeTrabajo);
+    private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria(unidadDeTrabajo);
     private final PublicadorEventos publicador = new PublicadorEventos();
     private final List<String> eventos = new ArrayList<>();
     private final ContratacionService service = new ContratacionService(contrataciones, publicaciones, wallets,
             perfiles, new RetencionDePagos(),
             new PoliticaReintegroFactory(ReintegroPorAnticipacion.conUmbralesPorDefecto()),
-            new UnidadDeTrabajoEnMemoria(), publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
+            unidadDeTrabajo, publicador, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     private Publicacion publicacion;
     /** Empieza en 72 h: si cancela el cliente, recupera el 100 %. */
@@ -187,6 +192,18 @@ class ContratacionServiceTest {
         }
 
         @Test
+        void unClienteDadoDeBajaOSinWalletNoPuedeSolicitar() {
+            var mateo = perfiles.findByUserId(CLIENTE).orElseThrow();
+            mateo.darDeBaja(CLIENTE, "me voy", AHORA);
+            perfiles.save(mateo);
+            perfiles.save(Perfil.crear("user-sin-wallet", TipoPerfil.PROFESIONAL, "Sin wallet", ZoneId.of("UTC")));
+
+            assertThrows(PerfilInactivoException.class, () -> solicitar(CLIENTE, en72Horas));
+            assertThrows(RecursoNoEncontradoException.class, () -> solicitar("user-sin-wallet", en72Horas));
+            assertTrue(eventos.isEmpty());
+        }
+
+        @Test
         void unaPublicacionInexistenteSeInformaComoNoEncontrada() {
             var command = new SolicitarContratacionCommand(CLIENTE, UUID.randomUUID().toString(),
                     en72Horas.valor().toString(), "Hola", "Aprender");
@@ -225,6 +242,21 @@ class ContratacionServiceTest {
             assertThrows(CupoAgotadoException.class, () -> service.aceptar(PROVEEDOR, segunda.id()));
             assertEquals("PENDIENTE", estadoGuardado(segunda.id()), "la aceptación rechazada no cambió nada");
             assertEquals(1, reservados(en72Horas));
+        }
+
+        @Test
+        void conLaPublicacionPausadaSeAceptaUnaSolicitudQueYaHabiaLlegado() {
+            var contratacion = solicitar(CLIENTE, en72Horas);
+            publicacion = publicaciones.findById(publicacion.id()).orElseThrow();
+            publicacion.pausar(PROVEEDOR, "vacaciones", AHORA);
+            publicaciones.save(publicacion);
+
+            var aceptada = service.aceptar(PROVEEDOR, contratacion.id());
+
+            assertEquals("ACEPTADA", aceptada.estado());
+            assertEquals(1, reservados(en72Horas));
+            assertThrows(TransicionInvalidaException.class, () -> solicitar(OTRO_CLIENTE, en30Horas),
+                    "pausada no admite solicitudes nuevas");
         }
 
         @Test
@@ -370,6 +402,27 @@ class ContratacionServiceTest {
         }
 
         @Test
+        void siAlgoFallaDespuesDeMoverFondosNoQuedaNadaGuardado() {
+            // Una contratación pagada cuya publicación no está en el repositorio: cancelar reparte los
+            // fondos y recién después falla al buscar la publicación para liberar el cupo.
+            var huerfana = Contratacion.solicitar(CLIENTE, PROVEEDOR, PublicacionId.generate(),
+                    new Solicitud("Hola", "Aprender", en72Horas), AHORA.plus(Duration.ofHours(72)),
+                    new SkillCoins(PRECIO), AHORA);
+            huerfana.aceptar(PROVEEDOR, AHORA);
+            huerfana.pagar(CLIENTE, AHORA);
+            contrataciones.save(huerfana);
+            wallets.save(Wallet.reconstruir(Wallet.TITULAR_GARANTIA, new SkillCoins(PRECIO)));
+            var id = huerfana.id().valor().toString();
+
+            assertThrows(RecursoNoEncontradoException.class, () -> service.cancelar(CLIENTE, id, "Me voy"));
+
+            assertEquals("CONFIRMADA", estadoGuardado(id));
+            assertEquals(PRECIO, garantia());
+            assertEquals(SALDO_INICIAL, saldo(CLIENTE));
+            assertEquals(0, saldo(PROVEEDOR));
+        }
+
+        @Test
         void unTerceroNoPuedeCancelar() {
             var contratacion = confirmada(en72Horas);
 
@@ -412,6 +465,21 @@ class ContratacionServiceTest {
             assertEquals(en72Horas.valor().toString(), guardada.franjaId());
             assertNotNull(guardada.propuesta());
             assertEquals(1, reservados(en72Horas));
+        }
+
+        @Test
+        void conLaPublicacionPausadaSePuedeReprogramar() {
+            var contratacion = confirmada(en72Horas);
+            publicacion = publicaciones.findById(publicacion.id()).orElseThrow();
+            publicacion.pausar(PROVEEDOR, "vacaciones", AHORA);
+            publicaciones.save(publicacion);
+
+            service.proponerReprogramacion(PROVEEDOR, contratacion.id(), en30Horas.valor().toString());
+            var reprogramada = service.aceptarReprogramacion(CLIENTE, contratacion.id());
+
+            assertEquals(en30Horas.valor().toString(), reprogramada.franjaId());
+            assertEquals(1, reservados(en30Horas));
+            assertEquals(0, reservados(en72Horas));
         }
 
         @Test
