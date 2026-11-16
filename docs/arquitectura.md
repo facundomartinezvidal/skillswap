@@ -1,4 +1,4 @@
-# Arquitectura inicial
+# Arquitectura
 
 Este documento describe la base de código generada para continuar el TPI. La
 consigna PDF de la cátedra prevalece si difiere de esta interpretación.
@@ -24,8 +24,18 @@ ar.edu.uade.skillswap
 │   ├── wallet/              # Agregado Wallet, movimientos, retención de pagos y su repositorio
 │   │   └── exception/
 │   └── shared/              # SkillCoins, Puntaje, CambioEstado, EventoDominio y excepciones base
-├── application/             # Pendiente: casos de uso y puertos sobre el nuevo dominio
-├── infrastructure/          # Próximo hito: JPA, Flyway y adaptadores externos
+├── application/             # Casos de uso (un Service por flujo), DTOs y puertos que no son repositorios
+│   ├── shared/              # UnidadDeTrabajo, Ids, excepciones de aplicación
+│   ├── evento/              # Patrón Observer: PublicadorEventos y SuscriptorEvento
+│   ├── perfil/  publicacion/  contratacion/  wallet/
+│   ├── busqueda/            # BusquedaService, BuscadorPublicaciones; recomendacion/ (Strategy)
+│   └── notificacion/        # NotificadorDeInteresados (Observer), CanalEnvioFactory (Simple Factory)
+├── infrastructure/          # Implementaciones de los puertos
+│   ├── memoria/             # Repositorios, buscador y unidad de trabajo en memoria (tests y demo sin MySQL)
+│   ├── notificacion/        # Patrón Adapter: EmailAdapter y PushAdapter sobre proveedores simulados
+│   ├── identidad/           # ServicioIdentidadSimulado
+│   └── configuracion/       # BackendEnMemoria: composition root sin Spring
+│                            # (pendiente: JPA y Flyway, del equipo de persistencia)
 ├── controllers/             # Contrato actual de la UI Swing
 ├── model/                   # Modelos de vista existentes
 ├── mock/                    # Implementación de demostración existente
@@ -46,8 +56,11 @@ La infraestructura es un detalle: la capa de dominio no importa JPA, Hibernate,
 Swing, MySQL ni clases de `controllers`, `ui`, `mock` o `model`; `ArquitecturaTest`
 lo verifica en cada build. Los módulos de dominio se referencian entre sí solo
 por id (`PublicacionId`, `FranjaId` o el `userId` de las personas); la coordinación entre módulos corresponde a
-la capa de aplicación. La configuración manual de objetos se agregará en
-el punto de composición cuando se conecte la implementación persistente.
+la capa de aplicación. `ArquitecturaTest` también verifica que `application`
+dependa solo del dominio y que no use `reconstruir(...)` (eso es solo para los
+repositorios). La configuración de objetos es manual, por constructor:
+`BackendEnMemoria` arma todo con la implementación en memoria, y la versión con
+base de datos será otro composition root igual que cambie los repositorios.
 
 ## Dominio implementado
 
@@ -182,36 +195,64 @@ el punto de composición cuando se conecte la implementación persistente.
   restricción única `(contratacion_id, wallet_perfil_id, tipo)`.
 - Wallet no tiene estados ni variaciones, así que no introduce un patrón nuevo.
 
-Búsqueda, recomendaciones, el publicador de eventos, el envío de notificaciones
-por el canal elegido y el perfil público quedan para los siguientes hitos. La
-validación de que el tipo de perfil coincida con el tipo de publicación cruza
-dos módulos y la hará el caso de uso de publicar.
-
 ## Casos de uso y puertos
 
-La capa de aplicación (casos de uso, puertos de repositorio y unidad de trabajo)
-está pendiente de reconstruirse sobre este dominio. La primera versión se escribió
-sobre un modelo anterior y se eliminó al unificar el dominio. Al reconstruirla,
-los puertos de repositorio de cada agregado irán en la raíz de su módulo de
-dominio, y la concurrencia sobre el cupo se resolverá en persistencia con bloqueo
-optimista sobre la publicación, no con un conteo seguido de un guardado.
+Un Service por flujo, que se corresponde con las interfaces de `UiControllers`.
+Coordinan agregados que se conocen solo por id: las reglas viven en el dominio y
+el Service no tiene reglas de negocio. Reciben el `userId` de quien actúa y
+devuelven DTOs (records con colecciones inmodificables).
 
-## Patrones previstos
-
-| Patrón | Variación que resuelve | Evidencia |
+| Service | Qué hace | Casos de aceptación |
 |---|---|---|
-| State | Qué acciones admite cada estado de publicación y de contratación | `EstadoPublicacionTest`, `EstadoContratacionTest` y tests de los agregados |
-| Strategy | Política de reintegro según quién cancela y con cuánta anticipación; más adelante, recomendaciones | `PoliticaReintegroTest`, `PoliticaReintegroFactoryTest` |
-| Decorator | Promociones acumulables sobre el precio de una publicación: cada una modifica el resultado de la anterior, y un tipo nuevo es una clase nueva | `PromocionTest`, `PrecioTest` y `PublicacionTest.Promociones` |
-| Adapter | Identidad, email/push y persistencia JPA | Pendiente: implementar puertos en infraestructura |
-| Observer | Un evento puede notificar a cliente y proveedor | Dominio listo, falta el publicador: eventos e interesados en `ContratacionTest` y `EventosContratacionTest`, bandeja en `NotificacionTest` |
+| `PerfilService` | Alta validada contra la identidad, con Wallet y bono en una transacción; edición, disponibilidad, canal, baja lógica, perfil público | — |
+| `PublicacionService` | Borrador (el tipo sale del perfil), franjas, publicar, pausar, reanudar, cerrar, cancelar, promociones; solo el autor modifica; BORRADOR y PAUSADA solo los ve el autor | 2, 9 |
+| `BusquedaService` | Búsqueda con filtros, orden y paginación; recomendaciones con una `EstrategiaRecomendacion` intercambiable | 1, 7 |
+| `ContratacionService` | Solicitar, aceptar (reserva el cupo), pagar (retiene en garantía), iniciar, completar (libera al proveedor), cancelar con reintegro, reprogramar, calificar | 3, 4, 5, 6, 10 |
+| `WalletService` | Saldo, movimientos paginados, acreditación de demo | — |
+| `NotificacionService` | Bandeja paginada, marcar leída, marcar todas | 8 |
 
-State, Strategy y Decorator ya están implementados y cubiertos por tests. De
-Observer está listo el dominio (eventos con sus interesados y la notificación);
-el publicador y los suscriptores van en la capa de aplicación. Adapter queda
-para los hitos siguientes. No se
-introducen patrones sin una variación concreta. La UI mock actual sigue usando
-sus contratos anteriores hasta que se complete la adaptación de controllers.
+**Puertos.** Los repositorios están en la raíz de cada módulo de dominio
+(`PublicacionRepository`, `ContratacionRepository`, `WalletRepository`,
+`PerfilRepository`, `NotificacionRepository`), y los listados devuelven
+`Pagina<T>` (en `domain/shared`). En `application` están los puertos que no son
+repositorios: `UnidadDeTrabajo`, `BuscadorPublicaciones` (la búsqueda cruza
+publicación y perfil), `ServicioIdentidad` y `EnvioNotificacion`.
+
+**Atomicidad.** Aceptar, pagar, completar, cancelar, reprogramar, calificar y el
+alta de perfil corren en una `UnidadDeTrabajo`: o se guarda todo o nada. Con JPA
+será una `EntityTransaction`. En memoria, `UnidadDeTrabajoEnMemoria` anota los
+`save` y los aplica recién si la operación termina bien. Los repositorios en
+memoria devuelven copias (con `reconstruir`), como una base.
+
+**Eventos.** Después de confirmar, el Service pasa `extraerEventos()` al
+`PublicadorEventos`. El suscriptor `NotificadorDeInteresados` deja la
+notificación en la bandeja de cada interesado y la envía por el canal de su
+perfil. Un suscriptor que falla no deshace la operación ni corta a los demás.
+
+**Decisiones de la revisión de la capa de aplicación** (PRs #12 a #15):
+
+- El cupo se reserva al **aceptar** y no depende de que la publicación admita
+  solicitudes nuevas: con la publicación pausada se puede aceptar una solicitud
+  que ya llegó y reprogramar una contratación existente. Las solicitudes nuevas
+  las frena `Publicacion.franjaParaSolicitar`.
+- Una franja que ya empezó no se puede elegir.
+- `EstadoContratacion.ocupaCupo()` y `Publicacion.esVisiblePara(userId)` dejan
+  esas reglas en el dominio.
+- Limitación conocida: `findPublicadas()` no tiene límite (las recomendaciones
+  cargan todas las publicadas).
+
+## Patrones
+
+| Patrón | Variación que resuelve | Dónde | Evidencia |
+|---|---|---|---|
+| State | Qué acciones admite cada estado de publicación y de contratación | `domain/*/state` | `EstadoPublicacionTest`, `EstadoContratacionTest` |
+| Strategy | Política de reintegro según quién cancela; estrategia de recomendación | `domain/contratacion/strategy`, `application/busqueda/recomendacion` | `PoliticaReintegroTest`, `RecomendacionTest` (caso 7) |
+| Simple Factory | Elegir la política de reintegro; elegir el canal de envío según el perfil | `PoliticaReintegroFactory`, `CanalEnvioFactory` | `PoliticaReintegroFactoryTest`, `CanalEnvioFactoryTest` |
+| Decorator | Promociones acumulables sobre el precio | `domain/publicacion/decorator` | `PromocionTest`, `PrecioTest`, `PublicacionServiceTest` (caso 9) |
+| Observer | Un evento interesa a varias personas y puede tener varias reacciones | `PublicadorEventos`, `NotificadorDeInteresados` | `PublicadorEventosTest`, `NotificadorDeInteresadosTest` (caso 8) |
+| Adapter | Proveedores externos de email, push e identidad, reemplazables | `infrastructure/notificacion`, `infrastructure/identidad` | `AdaptersDeNotificacionTest`, caso 8 |
+
+No se introducen patrones sin una variación concreta.
 
 ## Migraciones
 
