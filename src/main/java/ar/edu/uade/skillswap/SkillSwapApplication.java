@@ -32,6 +32,7 @@ import java.util.List;
  * de la cátedra.
  * <ul>
  *   <li>{@code --memoria}: backend en memoria (plan B de la demo, sin MySQL).</li>
+ *   <li>{@code --usuario <userId>}: login simulado; usuario activo (por defecto {@code user-mateo}).</li>
  *   <li>{@code --screenshot <archivo>}: guarda la pantalla de inicio en un PNG y termina.</li>
  * </ul>
  */
@@ -43,9 +44,11 @@ public final class SkillSwapApplication {
         var argumentos = Arrays.asList(args);
         var clock = Clock.systemDefaultZone();
         UiControllers controllers = crearControllers(argumentos, clock);
+        int indiceUsuario = argumentos.indexOf("--usuario");
+        String usuario = indiceUsuario >= 0 && indiceUsuario + 1 < args.length ? args[indiceUsuario + 1] : "user-mateo";
         int screenshot = argumentos.indexOf("--screenshot");
         if (screenshot >= 0 && screenshot + 1 < args.length) {
-            SkillSwapView view = new SkillSwapView(controllers);
+            SkillSwapView view = new SkillSwapView(controllers, usuario);
             view.setSize(1365, 768); view.doLayout(); layoutTree(view);
             BufferedImage image = new BufferedImage(1365,768,BufferedImage.TYPE_INT_ARGB);
             Graphics2D g=image.createGraphics();g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);view.printAll(g);g.dispose();
@@ -56,7 +59,7 @@ public final class SkillSwapApplication {
             JFrame frame=new JFrame("SkillSwap");
             frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             frame.setMinimumSize(new Dimension(1120,700));frame.setSize(1365,820);frame.setLocationRelativeTo(null);
-            frame.setContentPane(new SkillSwapView(controllers));frame.setVisible(true);
+            frame.setContentPane(new SkillSwapView(controllers, usuario));frame.setVisible(true);
         });
     }
 
@@ -106,7 +109,9 @@ public final class SkillSwapApplication {
                 error.printStackTrace();
                 mensaje = "Ocurrió un error inesperado: " + error.getMessage();
             }
-            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, mensaje,
+            // Con la ventana activa como dueña, el cuadro aparece adelante y no queda escondido detrás de la app.
+            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                    java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow(), mensaje,
                     "No se pudo completar la operación", JOptionPane.WARNING_MESSAGE));
         });
     }
