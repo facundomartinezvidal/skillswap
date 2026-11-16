@@ -35,7 +35,7 @@ public final class PublicacionMapper {
 
     public static Promocion aPromocion(PromocionDTO promocion) {
         return switch (promocion.tipo()) {
-            case PORCENTUAL -> new DescuentoPorcentual(Math.toIntExact(promocion.valor()));
+            case PORCENTUAL -> new DescuentoPorcentual((int) promocion.valor());
             case FIJO -> new DescuentoFijo(new SkillCoins(promocion.valor()));
         };
     }
@@ -44,8 +44,10 @@ public final class PublicacionMapper {
         if (promocion instanceof DescuentoPorcentual porcentual) {
             return new PromocionDTO(PromocionDTO.Tipo.PORCENTUAL, porcentual.porcentaje());
         }
-        var fijo = (DescuentoFijo) promocion;
-        return new PromocionDTO(PromocionDTO.Tipo.FIJO, fijo.monto().valor());
+        if (promocion instanceof DescuentoFijo fijo) {
+            return new PromocionDTO(PromocionDTO.Tipo.FIJO, fijo.monto().valor());
+        }
+        throw new IllegalStateException("Tipo de promoción sin DTO: " + promocion.getClass().getSimpleName());
     }
 
     private static FranjaDTO aDTO(FranjaDisponibilidad franja, int cupo) {
