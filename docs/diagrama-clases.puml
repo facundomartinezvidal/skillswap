@@ -1,0 +1,1052 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Diagrama de clases: dominio y aplicación
+
+package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "BuscadorPublicaciones" as BuscadorPublicaciones {
+      +buscar(criterios: CriteriosBusqueda, pagina: PaginaSolicitada): Pagina<Publicacion>
+    }
+    interface "EstrategiaRecomendacion" as EstrategiaRecomendacion <<Strategy>> {
+      +recomendar(usuario: Perfil, candidatas: List<Publicacion>, cantidad: int): List<Publicacion>
+    }
+    interface "SuscriptorEvento" as SuscriptorEvento <<Observer>> {
+      +actualizar(evento: EventoDominio): void
+    }
+    interface "EnvioNotificacion" as EnvioNotificacion {
+      +enviar(destinatarioId: String, titulo: String, detalle: String): void
+    }
+    interface "ServicioIdentidad" as ServicioIdentidad {
+      +existe(userId: String): boolean
+    }
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo {
+      +ejecutar(operacion: Supplier<T>): T
+    }
+  }
+  package "busqueda" as pkg_Application_busqueda {
+    class "BusquedaService" as BusquedaService {
+      -buscador: BuscadorPublicaciones
+      -publicacionRepository: PublicacionRepository
+      -perfilRepository: PerfilRepository
+      -estrategia: EstrategiaRecomendacion
+      +buscar(criterios: CriteriosBusqueda, pagina: PaginaSolicitada): Pagina<PublicacionDTO>
+      +recomendar(userId: String, cantidad: int): List<PublicacionDTO>
+      +categorias(): List<String>
+    }
+    class "CriteriosBusqueda" as CriteriosBusqueda <<record>> {
+      +texto: String
+      +categoria: String
+      +modalidad: Modalidad
+      +precioMinimo: Long
+      +precioMaximo: Long
+      +habilidad: String
+      +reputacionMinima: Double
+      +orden: OrdenBusqueda
+    }
+    enum "OrdenBusqueda" as OrdenBusqueda {
+      RELEVANCIA
+      MEJOR_REPUTACION
+      MENOR_PRECIO
+      MAS_RECIENTE
+    }
+    class "AfinidadPorHabilidades" as AfinidadPorHabilidades <<Strategy>> {
+      -perfilRepository: PerfilRepository
+      +recomendar(usuario: Perfil, candidatas: List<Publicacion>, cantidad: int): List<Publicacion>
+    }
+    class "PopularidadReciente" as PopularidadReciente <<Strategy>> {
+      {static} +VENTANA_POR_DEFECTO: Duration
+      -contratacionRepository: ContratacionRepository
+      -clock: Clock
+      -ventana: Duration
+      +recomendar(usuario: Perfil, candidatas: List<Publicacion>, cantidad: int): List<Publicacion>
+    }
+  }
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionMapper" as ContratacionMapper_contratacion
+    class "ContratacionService" as ContratacionService {
+      -contratacionRepository: ContratacionRepository
+      -publicacionRepository: PublicacionRepository
+      -walletRepository: WalletRepository
+      -perfilRepository: PerfilRepository
+      -retencionDePagos: RetencionDePagos
+      -politicaReintegroFactory: PoliticaReintegroFactory
+      -unidadDeTrabajo: UnidadDeTrabajo
+      -publicadorEventos: PublicadorEventos
+      -clock: Clock
+      +solicitar(command: SolicitarContratacionCommand): ContratacionDTO
+      +aceptar(userId: String, contratacionId: String): ContratacionDTO
+      +rechazar(userId: String, contratacionId: String, motivo: String): ContratacionDTO
+      +pagar(userId: String, contratacionId: String): ContratacionDTO
+      +iniciar(userId: String, contratacionId: String): ContratacionDTO
+      +completar(userId: String, contratacionId: String): ContratacionDTO
+      +cancelar(userId: String, contratacionId: String, motivo: String): ContratacionDTO
+      +proponerReprogramacion(String, String, String): ContratacionDTO
+      +aceptarReprogramacion(userId: String, contratacionId: String): ContratacionDTO
+      +rechazarReprogramacion(userId: String, contratacionId: String): ContratacionDTO
+      +calificar(String, String, int, String): CalificacionDTO
+      +listarContrataciones(userId: String, pagina: PaginaSolicitada): Pagina<ContratacionDTO>
+      +verContratacion(userId: String, contratacionId: String): ContratacionDTO
+    }
+    class "CalificacionDTO" as CalificacionDTO <<record>> {
+      +autorId: String
+      +destinatarioId: String
+      +puntaje: int
+      +comentario: String
+      +fecha: Instant
+    }
+    class "CambioEstadoDTO" as CambioEstadoDTO <<record>> {
+      +desde: String
+      +hacia: String
+      +fecha: Instant
+      +actorId: String
+      +motivo: String
+    }
+    class "ContratacionDTO" as ContratacionDTO <<record>> {
+      +id: String
+      +publicacionId: String
+      +tituloPublicacion: String
+      +clienteId: String
+      +proveedorId: String
+      +franjaId: String
+      +inicioSesion: Instant
+      +precioAcordado: long
+      +estado: String
+      +propuesta: PropuestaReprogramacionDTO
+      +reintegro: ReintegroDTO
+      +historial: List<CambioEstadoDTO>
+      +calificaciones: List<CalificacionDTO>
+    }
+    class "PropuestaReprogramacionDTO" as PropuestaReprogramacionDTO <<record>> {
+      +propuestaPor: String
+      +franjaId: String
+      +inicio: Instant
+    }
+    class "ReintegroDTO" as ReintegroDTO <<record>> {
+      +alCliente: long
+      +alProveedor: long
+    }
+    class "SolicitarContratacionCommand" as SolicitarContratacionCommand <<record>> {
+      +clienteId: String
+      +publicacionId: String
+      +franjaId: String
+      +mensaje: String
+      +objetivo: String
+    }
+  }
+  package "evento" as pkg_Application_evento {
+    class "PublicadorEventos" as PublicadorEventos <<Observer>> {
+      -suscriptores: List<SuscriptorEvento>
+      +suscribir(suscriptor: SuscriptorEvento): void
+      +publicar(eventos: List<EventoDominio>): void
+    }
+  }
+  package "notificacion" as pkg_Application_notificacion {
+    class "CanalEnvioFactory" as CanalEnvioFactory <<Simple Factory>> {
+      {static} -SIN_ENVIO: EnvioNotificacion
+      -email: EnvioNotificacion
+      -push: EnvioNotificacion
+      +para(canal: CanalNotificacion): EnvioNotificacion
+    }
+    class "NotificacionService" as NotificacionService {
+      -notificacionRepository: NotificacionRepository
+      -unidadDeTrabajo: UnidadDeTrabajo
+      +listar(userId: String, pagina: PaginaSolicitada): Pagina<NotificacionDTO>
+      +marcarLeida(userId: String, notificacionId: String): void
+      +marcarTodasLeidas(userId: String): void
+    }
+    class "NotificadorDeInteresados" as NotificadorDeInteresados <<Observer>> {
+      -notificacionRepository: NotificacionRepository
+      -perfilRepository: PerfilRepository
+      -canales: CanalEnvioFactory
+      +actualizar(evento: EventoDominio): void
+    }
+    class "NotificacionDTO" as NotificacionDTO <<record>> {
+      +id: String
+      +tipo: String
+      +titulo: String
+      +detalle: String
+      +fecha: Instant
+      +leida: boolean
+    }
+  }
+  package "perfil" as pkg_Application_perfil {
+    class "PerfilMapper" as PerfilMapper_perfil
+    class "PerfilService" as PerfilService {
+      -perfilRepository: PerfilRepository
+      -walletRepository: WalletRepository
+      -publicacionRepository: PublicacionRepository
+      -contratacionRepository: ContratacionRepository
+      -servicioIdentidad: ServicioIdentidad
+      -unidadDeTrabajo: UnidadDeTrabajo
+      -bonoBienvenida: SkillCoins
+      -clock: Clock
+      +crearPerfil(command: CrearPerfilCommand): PerfilDTO
+      +editarPerfil(userId: String, command: EditarPerfilCommand): PerfilDTO
+      +agregarDisponibilidad(userId: String, disponibilidad: DisponibilidadDTO): PerfilDTO
+      +quitarDisponibilidad(userId: String, disponibilidad: DisponibilidadDTO): PerfilDTO
+      +elegirCanal(userId: String, canal: CanalNotificacion): PerfilDTO
+      +darDeBaja(userId: String, motivo: String): void
+      +verPerfil(userId: String): PerfilDTO
+    }
+    class "CrearPerfilCommand" as CrearPerfilCommand <<record>> {
+      +userId: String
+      +tipo: TipoPerfil
+      +nombreVisible: String
+      +zonaHoraria: ZoneId
+    }
+    class "DisponibilidadDTO" as DisponibilidadDTO <<record>> {
+      +dia: DayOfWeek
+      +inicio: LocalTime
+      +fin: LocalTime
+    }
+    class "EditarPerfilCommand" as EditarPerfilCommand <<record>> {
+      +nombreVisible: String
+      +biografia: String
+      +zonaHoraria: ZoneId
+      +habilidades: Set<String>
+      +intereses: Set<String>
+    }
+    class "PerfilDTO" as PerfilDTO <<record>> {
+      +userId: String
+      +tipo: TipoPerfil
+      +nombreVisible: String
+      +biografia: String
+      +zonaHoraria: ZoneId
+      +habilidades: Set<String>
+      +intereses: Set<String>
+      +disponibilidad: List<DisponibilidadDTO>
+      +canal: CanalNotificacion
+      +reputacion: double
+      +cantidadCalificaciones: int
+      +contratacionesCompletadas: long
+      +publicacionesActivas: List<PublicacionDTO>
+      +activo: boolean
+    }
+    class "PerfilDuplicadoException" as PerfilDuplicadoException
+  }
+  package "publicacion" as pkg_Application_publicacion {
+    class "PublicacionMapper" as PublicacionMapper_publicacion {
+      {static} +aDTO(p: Publicacion, autor: Perfil): PublicacionDTO
+      {static} +aPromocion(promocion: PromocionDTO): Promocion
+    }
+    class "PublicacionService" as PublicacionService {
+      -publicacionRepository: PublicacionRepository
+      -perfilRepository: PerfilRepository
+      -clock: Clock
+      +crearBorrador(userId: String, datos: DatosPublicacionCommand): PublicacionDTO
+      +editar(userId: String, publicacionId: String, datos: DatosPublicacionCommand): PublicacionDTO
+      +agregarFranja(String, String, Instant, Instant): PublicacionDTO
+      +publicar(userId: String, publicacionId: String): PublicacionDTO
+      +pausar(userId: String, publicacionId: String, motivo: String): PublicacionDTO
+      +reanudar(userId: String, publicacionId: String): PublicacionDTO
+      +cerrar(userId: String, publicacionId: String, motivo: String): PublicacionDTO
+      +cancelar(userId: String, publicacionId: String, motivo: String): PublicacionDTO
+      +agregarPromocion(String, String, PromocionDTO): PublicacionDTO
+      +quitarPromocion(String, String, PromocionDTO): PublicacionDTO
+      +listarPropias(userId: String, pagina: PaginaSolicitada): Pagina<PublicacionDTO>
+      +verPublicacion(userId: String, publicacionId: String): PublicacionDTO
+    }
+    class "DatosPublicacionCommand" as DatosPublicacionCommand <<record>> {
+      +titulo: String
+      +descripcion: String
+      +categoria: String
+      +modalidad: Modalidad
+      +duracionEstimada: Duration
+      +cupo: int
+      +precioBase: Long
+      +etiquetas: Set<String>
+    }
+    class "FranjaDTO" as FranjaDTO <<record>> {
+      +id: String
+      +inicio: Instant
+      +fin: Instant
+      +lugaresLibres: int
+    }
+    class "PromocionDTO" as PromocionDTO <<record>> {
+      +tipo: Tipo
+      +valor: long
+    }
+    enum "PromocionDTO.Tipo" as PromocionDTO_Tipo {
+      PORCENTUAL
+      FIJO
+    }
+    class "PublicacionDTO" as PublicacionDTO <<record>> {
+      +id: String
+      +autorId: String
+      +autorNombre: String
+      +reputacionAutor: double
+      +tipo: TipoPublicacion
+      +titulo: String
+      +descripcion: String
+      +categoria: String
+      +modalidad: Modalidad
+      +duracionEstimada: Duration
+      +cupo: int
+      +precioBase: Long
+      +precioFinal: Long
+      +etiquetas: Set<String>
+      +estado: String
+      +motivoCancelacion: String
+      +franjas: List<FranjaDTO>
+      +promociones: List<PromocionDTO>
+    }
+  }
+  package "shared" as pkg_Application_shared {
+    class "Ids" as Ids {
+      {static} +uuid(recurso: String, id: String): UUID
+    }
+    abstract class "ApplicationException" as ApplicationException
+    class "ConflictoDeConcurrenciaException" as ConflictoDeConcurrenciaException
+    class "PermisoDenegadoException" as PermisoDenegadoException
+    class "RecursoNoEncontradoException" as RecursoNoEncontradoException
+  }
+  package "wallet" as pkg_Application_wallet {
+    class "WalletService" as WalletService {
+      -walletRepository: WalletRepository
+      -clock: Clock
+      +consultarSaldo(userId: String): long
+      +listarMovimientos(userId: String, pagina: PaginaSolicitada): Pagina<MovimientoDTO>
+      +acreditarDemo(userId: String, importe: long): long
+    }
+    class "MovimientoDTO" as MovimientoDTO <<record>> {
+      +id: String
+      +tipo: TipoMovimiento
+      +importe: long
+      +saldoResultante: long
+      +concepto: String
+      +contratacionId: String
+      +fecha: Instant
+    }
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "contratacion" as pkg_Domain_contratacion {
+    class "Calificacion" as Calificacion <<record>> {
+      +id: CalificacionId
+      +autorId: String
+      +destinatarioId: String
+      +puntaje: Puntaje
+      +comentario: String
+      +fecha: Instant
+    }
+    class "CalificacionId" as CalificacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): CalificacionId
+    }
+    class "Contratacion" as Contratacion {
+      -id: ContratacionId
+      -publicacionId: PublicacionId
+      -clienteId: String
+      -proveedorId: String
+      -solicitud: Solicitud
+      -franjaId: FranjaId
+      -inicioSesion: Instant
+      -precioAcordado: SkillCoins
+      -estado: EstadoContratacion
+      -propuesta: PropuestaReprogramacion
+      -reintegro: Reintegro
+      -historial: List<CambioEstado>
+      -calificaciones: List<Calificacion>
+      -eventos: List<EventoDominio>
+      {static} +solicitar(String, String, PublicacionId, Solicitud, Instant, SkillCoins, …): Contratacion
+      {static} +reconstruir(ContratacionId, PublicacionId, String, String, Solicitud, …): Contratacion
+      +aceptar(actorId: String, ahora: Instant): void
+      +rechazar(actorId: String, motivo: String, ahora: Instant): void
+      +pagar(actorId: String, ahora: Instant): void
+      +iniciar(actorId: String, ahora: Instant): void
+      +completar(actorId: String, ahora: Instant): void
+      +cancelar(String, String, PoliticaReintegro, Instant): Reintegro
+      +proponerReprogramacion(String, FranjaId, Instant, Instant): void
+      +aceptarReprogramacion(actorId: String, ahora: Instant): FranjaId
+      +rechazarReprogramacion(actorId: String, ahora: Instant): void
+      +calificar(autorId: String, puntaje: Puntaje, comentario: String, ahora: Instant): Calificacion
+      +ocupaCupo(): boolean
+      +esParticipante(userId: String): boolean
+      +extraerEventos(): List<EventoDominio>
+    }
+    class "ContratacionId" as ContratacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): ContratacionId
+    }
+    interface "ContratacionRepository" as ContratacionRepository {
+      +findById(id: ContratacionId): Optional<Contratacion>
+      +save(contratacion: Contratacion): void
+      +findByParticipante(userId: String, pagina: PaginaSolicitada): Pagina<Contratacion>
+      +countCompletadasDe(userId: String): long
+      +countAceptadasDesde(desde: Instant): Map<PublicacionId, Long>
+    }
+    class "PropuestaReprogramacion" as PropuestaReprogramacion <<record>> {
+      +propuestaPor: String
+      +franjaId: FranjaId
+      +inicio: Instant
+    }
+    class "Reintegro" as Reintegro <<record>> {
+      +alCliente: SkillCoins
+      +alProveedor: SkillCoins
+      {static} +cero(): Reintegro
+    }
+    class "Solicitud" as Solicitud <<record>> {
+      +mensaje: String
+      +objetivo: String
+      +franjaElegida: FranjaId
+    }
+  }
+  package "contratacion.evento" as pkg_Domain_contratacion_evento {
+    class "ContratacionAceptada" as ContratacionAceptada <<record>>
+    class "ContratacionCancelada" as ContratacionCancelada <<record>>
+    class "PagoConfirmado" as PagoConfirmado <<record>>
+    class "ReprogramacionAceptada" as ReprogramacionAceptada <<record>>
+    class "ReprogramacionPropuesta" as ReprogramacionPropuesta <<record>>
+    class "SesionCompletada" as SesionCompletada <<record>>
+    class "SolicitudRecibida" as SolicitudRecibida <<record>>
+  }
+  package "contratacion.exception" as pkg_Domain_contratacion_exception {
+    class "AccionNoPermitidaException" as AccionNoPermitidaException
+    class "AutoSolicitudException" as AutoSolicitudException
+    class "CalificacionDuplicadaException" as CalificacionDuplicadaException
+    class "ReprogramacionInvalidaException" as ReprogramacionInvalidaException
+  }
+  package "contratacion.state" as pkg_Domain_contratacion_state {
+    class "Aceptada" as Aceptada <<record>> <<State>> {
+      +nombre(): String
+      +pagar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+      +admiteReprogramacion(): boolean
+      +ocupaCupo(): boolean
+    }
+    class "Cancelada" as Cancelada_contratacion_state <<record>> <<State>> {
+      +nombre(): String
+    }
+    class "Completada" as Completada <<record>> <<State>> {
+      +nombre(): String
+      +admiteCalificacion(): boolean
+      +ocupaCupo(): boolean
+    }
+    class "Confirmada" as Confirmada <<record>> <<State>> {
+      +nombre(): String
+      +iniciar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+      +admiteReprogramacion(): boolean
+      +ocupaCupo(): boolean
+    }
+    class "EnCurso" as EnCurso <<record>> <<State>> {
+      +nombre(): String
+      +completar(): EstadoContratacion
+      +ocupaCupo(): boolean
+    }
+    interface "EstadoContratacion" as EstadoContratacion <<State>> {
+      +nombre(): String
+      +aceptar(): EstadoContratacion
+      +rechazar(): EstadoContratacion
+      +pagar(): EstadoContratacion
+      +iniciar(): EstadoContratacion
+      +completar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+      +admiteReprogramacion(): boolean
+      +ocupaCupo(): boolean
+      +admiteCalificacion(): boolean
+    }
+    class "Pendiente" as Pendiente <<record>> <<State>> {
+      +nombre(): String
+      +aceptar(): EstadoContratacion
+      +rechazar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+    }
+    class "Rechazada" as Rechazada <<record>> <<State>> {
+      +nombre(): String
+    }
+  }
+  package "contratacion.strategy" as pkg_Domain_contratacion_strategy {
+    interface "PoliticaReintegro" as PoliticaReintegro <<Strategy>> {
+      +calcular(precio: SkillCoins, inicioSesion: Instant, ahora: Instant): Reintegro
+    }
+    class "PoliticaReintegroFactory" as PoliticaReintegroFactory <<Simple Factory>> {
+      -porAnticipacion: ReintegroPorAnticipacion
+      -total: ReintegroTotal
+      +paraCancelacion(contratacion: Contratacion, canceladorId: String): PoliticaReintegro
+    }
+    class "ReintegroPorAnticipacion" as ReintegroPorAnticipacion <<Strategy>> {
+      -para100: Duration
+      -para50: Duration
+      {static} +conUmbralesPorDefecto(): ReintegroPorAnticipacion
+      +calcular(precio: SkillCoins, inicioSesion: Instant, ahora: Instant): Reintegro
+    }
+    class "ReintegroTotal" as ReintegroTotal <<Strategy>> {
+      +calcular(precio: SkillCoins, inicioSesion: Instant, ahora: Instant): Reintegro
+    }
+  }
+  package "notificacion" as pkg_Domain_notificacion {
+    class "Notificacion" as Notificacion {
+      -id: NotificacionId
+      -destinatarioId: String
+      -tipo: String
+      -titulo: String
+      -detalle: String
+      -fecha: Instant
+      -leida: boolean
+      {static} +para(destinatarioId: String, evento: EventoDominio): Notificacion
+      {static} +reconstruir(NotificacionId, String, String, String, String, Instant, boolean): Notificacion
+      +marcarLeida(actorId: String): void
+      +estaLeida(): boolean
+    }
+    class "NotificacionId" as NotificacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): NotificacionId
+    }
+    interface "NotificacionRepository" as NotificacionRepository {
+      +findById(id: NotificacionId): Optional<Notificacion>
+      +save(notificacion: Notificacion): void
+      +findByDestinatario(destinatarioId: String, pagina: PaginaSolicitada): Pagina<Notificacion>
+      +findNoLeidas(destinatarioId: String): List<Notificacion>
+    }
+    class "NotificacionAjenaException" as NotificacionAjenaException
+  }
+  package "perfil" as pkg_Domain_perfil {
+    enum "CanalNotificacion" as CanalNotificacion {
+      EMAIL
+      PUSH
+      INTERNA
+    }
+    class "DisponibilidadSemanal" as DisponibilidadSemanal <<record>> {
+      +dia: DayOfWeek
+      +inicio: LocalTime
+      +fin: LocalTime
+      +seSolapaCon(otra: DisponibilidadSemanal): boolean
+    }
+    class "Perfil" as Perfil {
+      {static} -ACTIVO: String
+      {static} -INACTIVO: String
+      -userId: String
+      -tipo: TipoPerfil
+      -nombreVisible: String
+      -biografia: String
+      -zonaHoraria: ZoneId
+      -habilidades: Set<String>
+      -intereses: Set<String>
+      -disponibilidad: List<DisponibilidadSemanal>
+      -canal: CanalNotificacion
+      -reputacion: Reputacion
+      -activo: boolean
+      -historial: List<CambioEstado>
+      {static} +crear(userId: String, tipo: TipoPerfil, nombreVisible: String, zonaHoraria: ZoneId): Perfil
+      {static} +reconstruir(String, TipoPerfil, String, String, ZoneId, Set<String>, Set<String>, …): Perfil
+      +editarDatos(nombreVisible: String, biografia: String, zonaHoraria: ZoneId): void
+      +definirHabilidades(habilidades: Set<String>): void
+      +definirIntereses(intereses: Set<String>): void
+      +agregarDisponibilidad(dia: DayOfWeek, inicio: LocalTime, fin: LocalTime): void
+      +quitarDisponibilidad(franja: DisponibilidadSemanal): void
+      +elegirCanal(canal: CanalNotificacion): void
+      +registrarCalificacion(puntaje: Puntaje): void
+      +darDeBaja(actorId: String, motivo: String, ahora: Instant): void
+      +estaActivo(): boolean
+    }
+    interface "PerfilRepository" as PerfilRepository {
+      +findByUserId(userId: String): Optional<Perfil>
+      +findByUserIds(userIds: Collection<String>): List<Perfil>
+      +save(perfil: Perfil): void
+    }
+    class "Reputacion" as Reputacion <<record>> {
+      +sumaPuntajes: long
+      +cantidad: int
+      {static} +inicial(): Reputacion
+      +registrar(puntaje: Puntaje): Reputacion
+      +promedio(): double
+    }
+    enum "TipoPerfil" as TipoPerfil {
+      PROFESIONAL
+      ORGANIZACION
+    }
+    class "DisponibilidadInvalidaException" as DisponibilidadInvalidaException
+    class "PerfilInactivoException" as PerfilInactivoException
+  }
+  package "publicacion" as pkg_Domain_publicacion {
+    class "FranjaDisponibilidad" as FranjaDisponibilidad {
+      -id: FranjaId
+      -inicio: Instant
+      -fin: Instant
+      -reservados: int
+      {static} +reconstruir(FranjaId, Instant, Instant, int): FranjaDisponibilidad
+      +estaOcupada(cupo: int): boolean
+    }
+    class "FranjaId" as FranjaId <<record>> {
+      +valor: UUID
+      {static} +generate(): FranjaId
+    }
+    enum "Modalidad" as Modalidad {
+      REMOTA
+      PRESENCIAL
+      HIBRIDA
+    }
+    class "Publicacion" as Publicacion {
+      -id: PublicacionId
+      -autorId: String
+      -tipo: TipoPublicacion
+      -titulo: String
+      -descripcion: String
+      -categoria: String
+      -modalidad: Modalidad
+      -duracionEstimada: Duration
+      -cupo: int
+      -precioBase: SkillCoins
+      -etiquetas: Set<String>
+      -estado: EstadoPublicacion
+      -motivoCancelacion: String
+      -franjas: List<FranjaDisponibilidad>
+      -promociones: List<Promocion>
+      -historial: List<CambioEstado>
+      {static} +crearBorrador(autorId: String, tipo: TipoPublicacion): Publicacion
+      {static} +reconstruir(PublicacionId, String, TipoPublicacion, String, String, String, …): Publicacion
+      +editar(String, String, String, Modalidad, Duration, int, SkillCoins, Set<String>): void
+      +agregarFranja(inicio: Instant, fin: Instant): FranjaId
+      +publicar(actorId: String, ahora: Instant): void
+      +pausar(actorId: String, motivo: String, ahora: Instant): void
+      +reanudar(actorId: String, ahora: Instant): void
+      +cerrar(actorId: String, motivo: String, ahora: Instant): void
+      +cancelar(actorId: String, motivo: String, ahora: Instant): void
+      +admiteSolicitudes(): boolean
+      +franjaParaSolicitar(franjaId: FranjaId, ahora: Instant): FranjaDisponibilidad
+      +franjaDisponible(franjaId: FranjaId, ahora: Instant): FranjaDisponibilidad
+      +reservarCupo(franjaId: FranjaId): void
+      +esVisiblePara(userId: String): boolean
+      +liberarCupo(franjaId: FranjaId): void
+      +agregarPromocion(promocion: Promocion): void
+      +quitarPromocion(promocion: Promocion): void
+      +precioFinal(): SkillCoins
+    }
+    class "PublicacionId" as PublicacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): PublicacionId
+    }
+    interface "PublicacionRepository" as PublicacionRepository {
+      +findById(id: PublicacionId): Optional<Publicacion>
+      +save(publicacion: Publicacion): void
+      +findByAutor(autorId: String, pagina: PaginaSolicitada): Pagina<Publicacion>
+      +findActivasByAutor(autorId: String): List<Publicacion>
+      +findByIds(ids: Collection<PublicacionId>): List<Publicacion>
+      +findPublicadas(): List<Publicacion>
+      +categorias(): List<String>
+    }
+    enum "TipoPublicacion" as TipoPublicacion {
+      OFERTA
+      DESAFIO
+    }
+  }
+  package "publicacion.decorator" as pkg_Domain_publicacion_decorator {
+    class "DescuentoFijo" as DescuentoFijo <<record>> <<Decorator>> {
+      +monto: SkillCoins
+      +aplicar(precio: SkillCoins): SkillCoins
+    }
+    class "DescuentoPorcentual" as DescuentoPorcentual <<record>> <<Decorator>> {
+      +porcentaje: int
+      +aplicar(precio: SkillCoins): SkillCoins
+    }
+    interface "Precio" as Precio <<Decorator>> {
+      +valor(): SkillCoins
+    }
+    class "PrecioBase" as PrecioBase <<record>> <<Decorator>> {
+      +valor: SkillCoins
+    }
+    class "PrecioConPromocion" as PrecioConPromocion <<Decorator>> {
+      -envuelto: Precio
+      -promocion: Promocion
+      +valor(): SkillCoins
+    }
+    interface "Promocion" as Promocion <<Decorator>> {
+      +aplicar(precio: SkillCoins): SkillCoins
+    }
+  }
+  package "publicacion.exception" as pkg_Domain_publicacion_exception {
+    class "CupoAgotadoException" as CupoAgotadoException
+    class "FranjaInvalidaException" as FranjaInvalidaException
+    class "PublicacionIncompletaException" as PublicacionIncompletaException
+  }
+  package "publicacion.state" as pkg_Domain_publicacion_state {
+    class "Borrador" as Borrador <<record>> <<State>> {
+      +nombre(): String
+      +publicar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +editar(): void
+      +admitePromociones(): boolean
+      +esVisibleParaTodos(): boolean
+    }
+    class "Cancelada" as Cancelada_publicacion_state <<record>> <<State>> {
+      +nombre(): String
+    }
+    class "Cerrada" as Cerrada <<record>> <<State>> {
+      +nombre(): String
+    }
+    interface "EstadoPublicacion" as EstadoPublicacion <<State>> {
+      +nombre(): String
+      +publicar(): EstadoPublicacion
+      +pausar(): EstadoPublicacion
+      +reanudar(): EstadoPublicacion
+      +cerrar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +editar(): void
+      +admiteSolicitudes(): boolean
+      +esVisibleParaTodos(): boolean
+      +admiteReservas(): boolean
+      +admitePromociones(): boolean
+    }
+    class "Pausada" as Pausada <<record>> <<State>> {
+      +nombre(): String
+      +reanudar(): EstadoPublicacion
+      +cerrar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +admitePromociones(): boolean
+      +esVisibleParaTodos(): boolean
+      +admiteReservas(): boolean
+    }
+    class "Publicada" as Publicada <<record>> <<State>> {
+      +nombre(): String
+      +pausar(): EstadoPublicacion
+      +cerrar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +admiteSolicitudes(): boolean
+      +admitePromociones(): boolean
+      +admiteReservas(): boolean
+    }
+  }
+  package "shared" as pkg_Domain_shared {
+    class "CambioEstado" as CambioEstado <<record>> {
+      +desde: String
+      +hacia: String
+      +fecha: Instant
+      +actorId: String
+      +motivo: String
+    }
+    abstract class "DomainException" as DomainException
+    interface "EventoDominio" as EventoDominio {
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+      +ocurridoEn(): Instant
+    }
+    class "Pagina<T>" as Pagina <<record>> {
+      +elementos: List<T>
+      +numero: int
+      +tamanio: int
+      +total: long
+      {static} +de(todos: List<T>, pagina: PaginaSolicitada): Pagina<T>
+      +map(transformacion: Function<T, R>): Pagina<R>
+      +totalPaginas(): int
+    }
+    class "PaginaSolicitada" as PaginaSolicitada <<record>> {
+      +numero: int
+      +tamanio: int
+      {static} +primera(tamanio: int): PaginaSolicitada
+      +desde(): int
+    }
+    class "Puntaje" as Puntaje <<record>> {
+      +valor: int
+      {static} +MINIMO: int
+      {static} +MAXIMO: int
+    }
+    class "SkillCoins" as SkillCoins <<record>> {
+      +valor: long
+      +sumar(otro: SkillCoins): SkillCoins
+      +restar(otro: SkillCoins): SkillCoins
+      +esMenorQue(otro: SkillCoins): boolean
+    }
+    class "TransicionInvalidaException" as TransicionInvalidaException
+  }
+  package "wallet" as pkg_Domain_wallet {
+    class "Movimiento" as Movimiento <<record>> {
+      +id: MovimientoId
+      +tipo: TipoMovimiento
+      +importe: SkillCoins
+      +saldoResultante: SkillCoins
+      +concepto: String
+      +contratacionId: ContratacionId
+      +fecha: Instant
+      +importeConSigno(): long
+    }
+    class "MovimientoId" as MovimientoId <<record>> {
+      +valor: UUID
+      {static} +generate(): MovimientoId
+    }
+    class "RetencionDePagos" as RetencionDePagos {
+      +retener(Wallet, Wallet, SkillCoins, ContratacionId, Instant): void
+      +liberarAlProveedor(Wallet, Wallet, SkillCoins, ContratacionId, Instant): void
+      +repartir(Wallet, Wallet, Wallet, SkillCoins, SkillCoins, SkillCoins, ContratacionId, …): void
+    }
+    enum "TipoMovimiento" as TipoMovimiento {
+      CREDITO
+      DEBITO
+      REINTEGRO
+      ACREDITACION_DEMO
+    }
+    class "Wallet" as Wallet {
+      {static} +TITULAR_GARANTIA: String
+      {static} -CONCEPTO_BONO: String
+      {static} -CONCEPTO_DEMO: String
+      -titularId: String
+      -saldo: SkillCoins
+      -movimientosNuevos: List<Movimiento>
+      {static} +abrir(titularId: String, bonoBienvenida: SkillCoins, ahora: Instant): Wallet
+      {static} +abrirGarantia(): Wallet
+      {static} +reconstruir(titularId: String, saldo: SkillCoins): Wallet
+      +debitar(SkillCoins, String, ContratacionId, Instant): Movimiento
+      +acreditar(SkillCoins, String, ContratacionId, Instant): Movimiento
+      +reintegrar(SkillCoins, String, ContratacionId, Instant): Movimiento
+      +acreditarDemo(importe: SkillCoins, ahora: Instant): Movimiento
+      +esGarantia(): boolean
+    }
+    interface "WalletRepository" as WalletRepository {
+      +findByTitular(titularId: String): Optional<Wallet>
+      +garantia(): Wallet
+      +save(wallet: Wallet): void
+      +findMovimientos(titularId: String, pagina: PaginaSolicitada): Pagina<Movimiento>
+    }
+    class "SaldoInsuficienteException" as SaldoInsuficienteException
+  }
+}
+
+PerfilDuplicadoException --|> ApplicationException
+ConflictoDeConcurrenciaException --|> ApplicationException
+PermisoDenegadoException --|> ApplicationException
+RecursoNoEncontradoException --|> ApplicationException
+AccionNoPermitidaException --|> DomainException
+AutoSolicitudException --|> DomainException
+CalificacionDuplicadaException --|> DomainException
+ReprogramacionInvalidaException --|> DomainException
+NotificacionAjenaException --|> DomainException
+DisponibilidadInvalidaException --|> DomainException
+PerfilInactivoException --|> DomainException
+CupoAgotadoException --|> DomainException
+FranjaInvalidaException --|> DomainException
+PublicacionIncompletaException --|> DomainException
+TransicionInvalidaException --|> DomainException
+SaldoInsuficienteException --|> DomainException
+AfinidadPorHabilidades ..|> EstrategiaRecomendacion
+PopularidadReciente ..|> EstrategiaRecomendacion
+NotificadorDeInteresados ..|> SuscriptorEvento
+ContratacionAceptada ..|> EventoDominio
+ContratacionCancelada ..|> EventoDominio
+PagoConfirmado ..|> EventoDominio
+ReprogramacionAceptada ..|> EventoDominio
+ReprogramacionPropuesta ..|> EventoDominio
+SesionCompletada ..|> EventoDominio
+SolicitudRecibida ..|> EventoDominio
+Aceptada ..|> EstadoContratacion
+Cancelada_contratacion_state ..|> EstadoContratacion
+Completada ..|> EstadoContratacion
+Confirmada ..|> EstadoContratacion
+EnCurso ..|> EstadoContratacion
+Pendiente ..|> EstadoContratacion
+Rechazada ..|> EstadoContratacion
+ReintegroPorAnticipacion ..|> PoliticaReintegro
+ReintegroTotal ..|> PoliticaReintegro
+DescuentoFijo ..|> Promocion
+DescuentoPorcentual ..|> Promocion
+PrecioBase ..|> Precio
+PrecioConPromocion ..|> Precio
+Borrador ..|> EstadoPublicacion
+Cancelada_publicacion_state ..|> EstadoPublicacion
+Cerrada ..|> EstadoPublicacion
+Pausada ..|> EstadoPublicacion
+Publicada ..|> EstadoPublicacion
+Contratacion "1" *-- "*" Calificacion
+Contratacion "1" *-- "1" PropuestaReprogramacion
+Contratacion "1" *-- "1" Reintegro
+Contratacion "1" *-- "1" Solicitud
+Contratacion "1" *-- "*" CambioEstado
+Perfil "1" *-- "*" DisponibilidadSemanal
+Perfil "1" *-- "1" Reputacion
+Perfil "1" *-- "*" CambioEstado
+Publicacion "1" *-- "*" FranjaDisponibilidad
+Publicacion "1" *-- "*" Promocion
+Publicacion "1" *-- "*" CambioEstado
+Wallet "1" *-- "*" Movimiento
+PublicadorEventos o-- "*" SuscriptorEvento
+Contratacion o-- "*" EventoDominio
+BusquedaService --> "1" BuscadorPublicaciones
+BusquedaService --> "1" EstrategiaRecomendacion
+BusquedaService --> "1" PerfilRepository
+BusquedaService --> "1" PublicacionRepository
+AfinidadPorHabilidades --> "1" PerfilRepository
+PopularidadReciente --> "1" ContratacionRepository
+ContratacionService --> "1" PublicadorEventos
+ContratacionService --> "1" UnidadDeTrabajo
+ContratacionService --> "1" ContratacionRepository
+ContratacionService --> "1" PoliticaReintegroFactory
+ContratacionService --> "1" PerfilRepository
+ContratacionService --> "1" PublicacionRepository
+ContratacionService --> "1" RetencionDePagos
+ContratacionService --> "1" WalletRepository
+ContratacionDTO --> "*" CalificacionDTO
+ContratacionDTO --> "*" CambioEstadoDTO
+ContratacionDTO --> "1" PropuestaReprogramacionDTO
+ContratacionDTO --> "1" ReintegroDTO
+CanalEnvioFactory --> "1" EnvioNotificacion
+NotificacionService --> "1" UnidadDeTrabajo
+NotificacionService --> "1" NotificacionRepository
+NotificadorDeInteresados --> "1" CanalEnvioFactory
+NotificadorDeInteresados --> "1" NotificacionRepository
+NotificadorDeInteresados --> "1" PerfilRepository
+PerfilService --> "1" ServicioIdentidad
+PerfilService --> "1" UnidadDeTrabajo
+PerfilService --> "1" ContratacionRepository
+PerfilService --> "1" PerfilRepository
+PerfilService --> "1" PublicacionRepository
+PerfilService --> "1" WalletRepository
+PerfilDTO --> "*" DisponibilidadDTO
+PerfilDTO --> "*" PublicacionDTO
+PublicacionService --> "1" PerfilRepository
+PublicacionService --> "1" PublicacionRepository
+PublicacionDTO --> "*" FranjaDTO
+PublicacionDTO --> "*" PromocionDTO
+WalletService --> "1" WalletRepository
+Contratacion --> "1" EstadoContratacion
+PoliticaReintegroFactory --> "1" ReintegroPorAnticipacion
+PoliticaReintegroFactory --> "1" ReintegroTotal
+Publicacion --> "1" EstadoPublicacion
+PrecioConPromocion --> "1" Promocion
+BusquedaService ..> CriteriosBusqueda
+BusquedaService ..> PublicacionMapper_publicacion
+BusquedaService ..> PublicacionDTO
+BusquedaService ..> Perfil
+BusquedaService ..> Publicacion
+ContratacionService ..> ContratacionMapper_contratacion
+ContratacionService ..> CalificacionDTO
+ContratacionService ..> ContratacionDTO
+ContratacionService ..> SolicitarContratacionCommand
+ContratacionService ..> Ids
+ContratacionService ..> Contratacion
+ContratacionService ..> Solicitud
+ContratacionService ..> Publicacion
+NotificacionService ..> NotificacionDTO
+NotificacionService ..> Ids
+PerfilService ..> PerfilMapper_perfil
+PerfilService ..> CrearPerfilCommand
+PerfilService ..> DisponibilidadDTO
+PerfilService ..> EditarPerfilCommand
+PerfilService ..> PerfilDTO
+PerfilService ..> PublicacionMapper_publicacion
+PerfilService ..> DisponibilidadSemanal
+PerfilService ..> Perfil
+PerfilService ..> Wallet
+PublicacionService ..> PublicacionMapper_publicacion
+PublicacionService ..> DatosPublicacionCommand
+PublicacionService ..> PromocionDTO
+PublicacionService ..> PublicacionDTO
+PublicacionService ..> Ids
+PublicacionService ..> Publicacion
+WalletService ..> MovimientoDTO
+WalletService ..> Wallet
+
+BuscadorPublicaciones -[hidden]down- EnvioNotificacion
+EstrategiaRecomendacion -[hidden]down- ServicioIdentidad
+SuscriptorEvento -[hidden]down- UnidadDeTrabajo
+BusquedaService -[hidden]down- AfinidadPorHabilidades
+CriteriosBusqueda -[hidden]down- PopularidadReciente
+ContratacionMapper_contratacion -[hidden]down- CambioEstadoDTO
+ContratacionService -[hidden]down- ContratacionDTO
+CalificacionDTO -[hidden]down- PropuestaReprogramacionDTO
+CambioEstadoDTO -[hidden]down- ReintegroDTO
+ContratacionDTO -[hidden]down- SolicitarContratacionCommand
+CanalEnvioFactory -[hidden]down- NotificadorDeInteresados
+NotificacionService -[hidden]down- NotificacionDTO
+PerfilMapper_perfil -[hidden]down- DisponibilidadDTO
+PerfilService -[hidden]down- EditarPerfilCommand
+CrearPerfilCommand -[hidden]down- PerfilDTO
+DisponibilidadDTO -[hidden]down- PerfilDuplicadoException
+PublicacionMapper_publicacion -[hidden]down- FranjaDTO
+PublicacionService -[hidden]down- PromocionDTO
+DatosPublicacionCommand -[hidden]down- PromocionDTO_Tipo
+FranjaDTO -[hidden]down- PublicacionDTO
+Ids -[hidden]down- PermisoDenegadoException
+ApplicationException -[hidden]down- RecursoNoEncontradoException
+UnidadDeTrabajo -[hidden]down- PublicadorEventos
+PopularidadReciente -[hidden]down- CanalEnvioFactory
+SolicitarContratacionCommand -[hidden]down- PerfilMapper_perfil
+PublicadorEventos -[hidden]down- PublicacionMapper_publicacion
+NotificacionDTO -[hidden]down- Ids
+PerfilDuplicadoException -[hidden]down- WalletService
+Calificacion -[hidden]down- ContratacionId
+CalificacionId -[hidden]down- ContratacionRepository
+Contratacion -[hidden]down- PropuestaReprogramacion
+ContratacionId -[hidden]down- Reintegro
+ContratacionRepository -[hidden]down- Solicitud
+ContratacionAceptada -[hidden]down- ReprogramacionAceptada
+ContratacionCancelada -[hidden]down- ReprogramacionPropuesta
+PagoConfirmado -[hidden]down- SesionCompletada
+ReprogramacionAceptada -[hidden]down- SolicitudRecibida
+AccionNoPermitidaException -[hidden]down- CalificacionDuplicadaException
+AutoSolicitudException -[hidden]down- ReprogramacionInvalidaException
+Aceptada -[hidden]down- Confirmada
+Cancelada_contratacion_state -[hidden]down- EnCurso
+Completada -[hidden]down- EstadoContratacion
+Confirmada -[hidden]down- Pendiente
+EnCurso -[hidden]down- Rechazada
+PoliticaReintegro -[hidden]down- ReintegroPorAnticipacion
+PoliticaReintegroFactory -[hidden]down- ReintegroTotal
+Notificacion -[hidden]down- NotificacionRepository
+NotificacionId -[hidden]down- NotificacionAjenaException
+CanalNotificacion -[hidden]down- PerfilRepository
+DisponibilidadSemanal -[hidden]down- Reputacion
+Perfil -[hidden]down- TipoPerfil
+PerfilRepository -[hidden]down- DisponibilidadInvalidaException
+Reputacion -[hidden]down- PerfilInactivoException
+FranjaDisponibilidad -[hidden]down- Publicacion
+FranjaId -[hidden]down- PublicacionId
+Modalidad -[hidden]down- PublicacionRepository
+Publicacion -[hidden]down- TipoPublicacion
+DescuentoFijo -[hidden]down- PrecioBase
+DescuentoPorcentual -[hidden]down- PrecioConPromocion
+Precio -[hidden]down- Promocion
+CupoAgotadoException -[hidden]down- PublicacionIncompletaException
+Borrador -[hidden]down- EstadoPublicacion
+Cancelada_publicacion_state -[hidden]down- Pausada
+Cerrada -[hidden]down- Publicada
+CambioEstado -[hidden]down- Pagina
+DomainException -[hidden]down- PaginaSolicitada
+EventoDominio -[hidden]down- Puntaje
+Pagina -[hidden]down- SkillCoins
+PaginaSolicitada -[hidden]down- TransicionInvalidaException
+Movimiento -[hidden]down- TipoMovimiento
+MovimientoId -[hidden]down- Wallet
+RetencionDePagos -[hidden]down- WalletRepository
+TipoMovimiento -[hidden]down- SaldoInsuficienteException
+MovimientoDTO -[hidden]down- Calificacion
+Solicitud -[hidden]down- Aceptada
+SolicitudRecibida -[hidden]down- PoliticaReintegro
+ReprogramacionInvalidaException -[hidden]down- Notificacion
+Rechazada -[hidden]down- CanalNotificacion
+ReintegroTotal -[hidden]down- FranjaDisponibilidad
+NotificacionAjenaException -[hidden]down- DescuentoFijo
+PerfilInactivoException -[hidden]down- CupoAgotadoException
+TipoPublicacion -[hidden]down- Borrador
+Promocion -[hidden]down- CambioEstado
+PublicacionIncompletaException -[hidden]down- Movimiento
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml

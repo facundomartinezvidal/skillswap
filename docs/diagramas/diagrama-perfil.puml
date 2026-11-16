@@ -1,0 +1,217 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo perfil (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "ServicioIdentidad" as ServicioIdentidad #EEEEEE
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo #EEEEEE
+  }
+  package "busqueda" as pkg_Application_busqueda {
+    class "BusquedaService" as BusquedaService #EEEEEE
+    class "AfinidadPorHabilidades" as AfinidadPorHabilidades <<Strategy>> #EEEEEE
+  }
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionService" as ContratacionService #EEEEEE
+  }
+  package "notificacion" as pkg_Application_notificacion {
+    class "NotificadorDeInteresados" as NotificadorDeInteresados <<Observer>> #EEEEEE
+  }
+  package "perfil" as pkg_Application_perfil {
+    class "PerfilMapper" as PerfilMapper_perfil
+    class "PerfilService" as PerfilService {
+      -perfilRepository: PerfilRepository
+      -walletRepository: WalletRepository
+      -publicacionRepository: PublicacionRepository
+      -contratacionRepository: ContratacionRepository
+      -servicioIdentidad: ServicioIdentidad
+      -unidadDeTrabajo: UnidadDeTrabajo
+      -bonoBienvenida: SkillCoins
+      -clock: Clock
+      +crearPerfil(command: CrearPerfilCommand): PerfilDTO
+      +editarPerfil(userId: String, command: EditarPerfilCommand): PerfilDTO
+      +agregarDisponibilidad(userId: String, disponibilidad: DisponibilidadDTO): PerfilDTO
+      +quitarDisponibilidad(userId: String, disponibilidad: DisponibilidadDTO): PerfilDTO
+      +elegirCanal(userId: String, canal: CanalNotificacion): PerfilDTO
+      +darDeBaja(userId: String, motivo: String): void
+      +verPerfil(userId: String): PerfilDTO
+    }
+    class "CrearPerfilCommand" as CrearPerfilCommand <<record>> {
+      +userId: String
+      +tipo: TipoPerfil
+      +nombreVisible: String
+      +zonaHoraria: ZoneId
+    }
+    class "DisponibilidadDTO" as DisponibilidadDTO <<record>> {
+      +dia: DayOfWeek
+      +inicio: LocalTime
+      +fin: LocalTime
+    }
+    class "EditarPerfilCommand" as EditarPerfilCommand <<record>> {
+      +nombreVisible: String
+      +biografia: String
+      +zonaHoraria: ZoneId
+      +habilidades: Set<String>
+      +intereses: Set<String>
+    }
+    class "PerfilDTO" as PerfilDTO <<record>> {
+      +userId: String
+      +tipo: TipoPerfil
+      +nombreVisible: String
+      +biografia: String
+      +zonaHoraria: ZoneId
+      +habilidades: Set<String>
+      +intereses: Set<String>
+      +disponibilidad: List<DisponibilidadDTO>
+      +canal: CanalNotificacion
+      +reputacion: double
+      +cantidadCalificaciones: int
+      +contratacionesCompletadas: long
+      +publicacionesActivas: List<PublicacionDTO>
+      +activo: boolean
+    }
+    class "PerfilDuplicadoException" as PerfilDuplicadoException
+  }
+  package "publicacion" as pkg_Application_publicacion {
+    class "PublicacionDTO" as PublicacionDTO <<record>> #EEEEEE
+    class "PublicacionService" as PublicacionService #EEEEEE
+  }
+  package "shared" as pkg_Application_shared {
+    abstract class "ApplicationException" as ApplicationException #EEEEEE
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "contratacion" as pkg_Domain_contratacion {
+    interface "ContratacionRepository" as ContratacionRepository #EEEEEE
+  }
+  package "perfil" as pkg_Domain_perfil {
+    enum "CanalNotificacion" as CanalNotificacion {
+      EMAIL
+      PUSH
+      INTERNA
+    }
+    class "DisponibilidadSemanal" as DisponibilidadSemanal <<record>> {
+      +dia: DayOfWeek
+      +inicio: LocalTime
+      +fin: LocalTime
+      +seSolapaCon(otra: DisponibilidadSemanal): boolean
+    }
+    class "Perfil" as Perfil {
+      {static} -ACTIVO: String
+      {static} -INACTIVO: String
+      -userId: String
+      -tipo: TipoPerfil
+      -nombreVisible: String
+      -biografia: String
+      -zonaHoraria: ZoneId
+      -habilidades: Set<String>
+      -intereses: Set<String>
+      -disponibilidad: List<DisponibilidadSemanal>
+      -canal: CanalNotificacion
+      -reputacion: Reputacion
+      -activo: boolean
+      -historial: List<CambioEstado>
+      {static} +crear(userId: String, tipo: TipoPerfil, nombreVisible: String, zonaHoraria: ZoneId): Perfil
+      {static} +reconstruir(String, TipoPerfil, String, String, ZoneId, Set<String>, Set<String>, …): Perfil
+      +editarDatos(nombreVisible: String, biografia: String, zonaHoraria: ZoneId): void
+      +definirHabilidades(habilidades: Set<String>): void
+      +definirIntereses(intereses: Set<String>): void
+      +agregarDisponibilidad(dia: DayOfWeek, inicio: LocalTime, fin: LocalTime): void
+      +quitarDisponibilidad(franja: DisponibilidadSemanal): void
+      +elegirCanal(canal: CanalNotificacion): void
+      +registrarCalificacion(puntaje: Puntaje): void
+      +darDeBaja(actorId: String, motivo: String, ahora: Instant): void
+      +estaActivo(): boolean
+    }
+    interface "PerfilRepository" as PerfilRepository {
+      +findByUserId(userId: String): Optional<Perfil>
+      +findByUserIds(userIds: Collection<String>): List<Perfil>
+      +save(perfil: Perfil): void
+    }
+    class "Reputacion" as Reputacion <<record>> {
+      +sumaPuntajes: long
+      +cantidad: int
+      {static} +inicial(): Reputacion
+      +registrar(puntaje: Puntaje): Reputacion
+      +promedio(): double
+    }
+    enum "TipoPerfil" as TipoPerfil {
+      PROFESIONAL
+      ORGANIZACION
+    }
+    class "DisponibilidadInvalidaException" as DisponibilidadInvalidaException
+    class "PerfilInactivoException" as PerfilInactivoException {
+      -userId: String
+    }
+  }
+  package "publicacion" as pkg_Domain_publicacion {
+    interface "PublicacionRepository" as PublicacionRepository #EEEEEE
+  }
+  package "shared" as pkg_Domain_shared {
+    abstract class "DomainException" as DomainException #EEEEEE
+    class "CambioEstado" as CambioEstado <<record>> #EEEEEE
+  }
+  package "wallet" as pkg_Domain_wallet {
+    interface "WalletRepository" as WalletRepository #EEEEEE
+  }
+}
+
+PerfilDuplicadoException --|> ApplicationException
+DisponibilidadInvalidaException --|> DomainException
+PerfilInactivoException --|> DomainException
+Perfil "1" *-- "*" DisponibilidadSemanal : disponibilidad
+Perfil "1" *-- "1" Reputacion : reputacion
+Perfil "1" *-- "*" CambioEstado : historial
+BusquedaService --> "1" PerfilRepository : perfilRepository
+AfinidadPorHabilidades --> "1" PerfilRepository : perfilRepository
+ContratacionService --> "1" PerfilRepository : perfilRepository
+NotificadorDeInteresados --> "1" PerfilRepository : perfilRepository
+PerfilService --> "1" ServicioIdentidad : servicioIdentidad
+PerfilService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+PerfilService --> "1" ContratacionRepository : contratacionRepository
+PerfilService --> "1" PerfilRepository : perfilRepository
+PerfilService --> "1" PublicacionRepository : publicacionRepository
+PerfilService --> "1" WalletRepository : walletRepository
+PerfilDTO --> "*" DisponibilidadDTO : disponibilidad
+PerfilDTO --> "*" PublicacionDTO : publicacionesActivas
+PublicacionService --> "1" PerfilRepository : perfilRepository
+PerfilMapper_perfil ..> DisponibilidadDTO
+PerfilMapper_perfil ..> PerfilDTO
+PerfilService ..> PerfilMapper_perfil
+PerfilService ..> CrearPerfilCommand
+PerfilService ..> DisponibilidadDTO
+PerfilService ..> EditarPerfilCommand
+PerfilService ..> PerfilDTO
+PerfilService ..> DisponibilidadSemanal
+PerfilService ..> Perfil
+PerfilRepository ..> Perfil
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml
