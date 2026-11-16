@@ -13,9 +13,7 @@ import ar.edu.uade.skillswap.domain.perfil.CanalNotificacion;
 import ar.edu.uade.skillswap.domain.perfil.DisponibilidadSemanal;
 import ar.edu.uade.skillswap.domain.perfil.Perfil;
 import ar.edu.uade.skillswap.domain.perfil.PerfilRepository;
-import ar.edu.uade.skillswap.domain.publicacion.Publicacion;
 import ar.edu.uade.skillswap.domain.publicacion.PublicacionRepository;
-import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.wallet.Wallet;
 import ar.edu.uade.skillswap.domain.wallet.WalletRepository;
@@ -30,9 +28,6 @@ import java.util.Set;
  * (regla 10). Las reglas (baja lógica, disponibilidad sin superposiciones) las valida el {@link Perfil}.
  */
 public class PerfilService {
-
-    /** Cuántas publicaciones del autor se revisan para armar las activas del perfil público. */
-    private static final int PUBLICACIONES_EN_PERFIL = 50;
 
     private final PerfilRepository perfilRepository;
     private final WalletRepository walletRepository;
@@ -130,10 +125,7 @@ public class PerfilService {
     }
 
     private PerfilDTO aDTO(Perfil perfil) {
-        var activas = publicacionRepository
-                .findByAutor(perfil.userId(), PaginaSolicitada.primera(PUBLICACIONES_EN_PERFIL))
-                .elementos().stream()
-                .filter(Publicacion::admiteSolicitudes)
+        var activas = publicacionRepository.findActivasByAutor(perfil.userId()).stream()
                 .map(publicacion -> PublicacionMapper.aDTO(publicacion, perfil))
                 .toList();
         var completadas = contratacionRepository.countCompletadasDe(perfil.userId());

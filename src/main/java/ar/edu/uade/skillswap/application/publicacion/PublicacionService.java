@@ -3,7 +3,6 @@ package ar.edu.uade.skillswap.application.publicacion;
 import ar.edu.uade.skillswap.application.publicacion.dto.DatosPublicacionCommand;
 import ar.edu.uade.skillswap.application.publicacion.dto.PromocionDTO;
 import ar.edu.uade.skillswap.application.publicacion.dto.PublicacionDTO;
-import ar.edu.uade.skillswap.application.publicacion.exception.TipoDePerfilIncompatibleException;
 import ar.edu.uade.skillswap.application.shared.Ids;
 import ar.edu.uade.skillswap.application.shared.exception.PermisoDenegadoException;
 import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
@@ -42,7 +41,11 @@ public class PublicacionService {
         this.clock = Objects.requireNonNull(clock);
     }
 
-    /** Crea el borrador. El tipo sale del perfil del autor: un profesional publica ofertas y una organización, desafíos. */
+    /**
+     * Crea el borrador. El tipo sale del perfil del autor: un profesional publica ofertas y una
+     * organización, desafíos. Como el tipo de perfil no cambia, la publicación siempre coincide con su
+     * autor y {@link #publicar} no necesita volver a validarlo.
+     */
     public PublicacionDTO crearBorrador(String userId, DatosPublicacionCommand datos) {
         var autor = perfilActivo(userId, "crear una publicación");
         var tipo = autor.tipo() == TipoPerfil.PROFESIONAL ? TipoPublicacion.OFERTA : TipoPublicacion.DESAFIO;
@@ -64,14 +67,10 @@ public class PublicacionService {
         return guardar(publicacion);
     }
 
-    /** Valida además que el tipo de perfil del autor coincida con el tipo de publicación. */
+    /** Un perfil dado de baja no publica. Los requisitos para publicar los valida la {@link Publicacion}. */
     public PublicacionDTO publicar(String userId, String publicacionId) {
         var publicacion = buscarPropia(userId, publicacionId, "publicar");
-        var autor = perfilActivo(userId, "publicar");
-        var tipoEsperado = autor.tipo() == TipoPerfil.PROFESIONAL ? TipoPublicacion.OFERTA : TipoPublicacion.DESAFIO;
-        if (publicacion.tipo() != tipoEsperado) {
-            throw new TipoDePerfilIncompatibleException(autor.tipo(), publicacion.tipo());
-        }
+        perfilActivo(userId, "publicar");
         publicacion.publicar(userId, ahora());
         return guardar(publicacion);
     }
@@ -118,9 +117,16 @@ public class PublicacionService {
         return publicacionRepository.findByAutor(userId, pagina).map(p -> PublicacionMapper.aDTO(p, autor));
     }
 
-    /** Detalle con franjas y lugares libres, para elegir al solicitar. */
-    public PublicacionDTO verPublicacion(String publicacionId) {
-        return aDTO(buscar(publicacionId));
+    /**
+     * Detalle con franjas y lugares libres, para elegir al solicitar. Un BORRADOR o una PAUSADA solo
+     * la ve su autor; para los demás es como si no existiera.
+     */
+    public PublicacionDTO verPublicacion(String userId, String publicacionId) {
+        var publicacion = buscar(publicacionId);
+        if (!publicacion.esVisiblePara(userId)) {
+            throw new RecursoNoEncontradoException("publicación", publicacionId);
+        }
+        return aDTO(publicacion);
     }
 
     private void editarCon(Publicacion publicacion, DatosPublicacionCommand datos) {

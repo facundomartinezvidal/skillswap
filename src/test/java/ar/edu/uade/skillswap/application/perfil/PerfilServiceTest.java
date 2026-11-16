@@ -48,14 +48,15 @@ class PerfilServiceTest {
     private static final DisponibilidadDTO LUNES_10_A_12 =
             new DisponibilidadDTO(DayOfWeek.MONDAY, LocalTime.of(10, 0), LocalTime.of(12, 0));
 
-    private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria();
-    private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria();
-    private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria();
-    private final ContratacionRepositoryEnMemoria contrataciones = new ContratacionRepositoryEnMemoria();
+    private final UnidadDeTrabajoEnMemoria unidadDeTrabajo = new UnidadDeTrabajoEnMemoria();
+    private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria(unidadDeTrabajo);
+    private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria(unidadDeTrabajo);
+    private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria(unidadDeTrabajo);
+    private final ContratacionRepositoryEnMemoria contrataciones = new ContratacionRepositoryEnMemoria(unidadDeTrabajo);
     /** Servicio de identidad simulado: conoce solo a estos usuarios. */
     private final ServicioIdentidad identidad = userId -> Set.of("user-ana", "user-mateo").contains(userId);
     private final PerfilService service = new PerfilService(perfiles, wallets, publicaciones, contrataciones,
-            identidad, new UnidadDeTrabajoEnMemoria(), new SkillCoins(BONO), Clock.fixed(AHORA, ZoneOffset.UTC));
+            identidad, unidadDeTrabajo, new SkillCoins(BONO), Clock.fixed(AHORA, ZoneOffset.UTC));
 
     private void crearAna() {
         service.crearPerfil(new CrearPerfilCommand("user-ana", TipoPerfil.PROFESIONAL, "Ana", BUENOS_AIRES));

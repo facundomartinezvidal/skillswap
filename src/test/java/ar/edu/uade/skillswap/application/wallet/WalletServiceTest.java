@@ -6,6 +6,7 @@ import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.wallet.TipoMovimiento;
 import ar.edu.uade.skillswap.domain.wallet.Wallet;
+import ar.edu.uade.skillswap.infrastructure.memoria.UnidadDeTrabajoEnMemoria;
 import ar.edu.uade.skillswap.infrastructure.memoria.WalletRepositoryEnMemoria;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +22,8 @@ class WalletServiceTest {
 
     private static final Instant AHORA = Instant.parse("2026-11-16T12:00:00Z");
 
-    private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria();
+    private final UnidadDeTrabajoEnMemoria unidadDeTrabajo = new UnidadDeTrabajoEnMemoria();
+    private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria(unidadDeTrabajo);
     private final WalletService service = new WalletService(wallets, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @BeforeEach

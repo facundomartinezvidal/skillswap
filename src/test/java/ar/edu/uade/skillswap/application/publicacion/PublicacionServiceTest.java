@@ -3,14 +3,12 @@ package ar.edu.uade.skillswap.application.publicacion;
 import ar.edu.uade.skillswap.application.publicacion.dto.DatosPublicacionCommand;
 import ar.edu.uade.skillswap.application.publicacion.dto.PromocionDTO;
 import ar.edu.uade.skillswap.application.publicacion.dto.PublicacionDTO;
-import ar.edu.uade.skillswap.application.publicacion.exception.TipoDePerfilIncompatibleException;
 import ar.edu.uade.skillswap.application.shared.exception.PermisoDenegadoException;
 import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
 import ar.edu.uade.skillswap.domain.perfil.Perfil;
 import ar.edu.uade.skillswap.domain.perfil.TipoPerfil;
 import ar.edu.uade.skillswap.domain.perfil.exception.PerfilInactivoException;
 import ar.edu.uade.skillswap.domain.publicacion.Modalidad;
-import ar.edu.uade.skillswap.domain.publicacion.Publicacion;
 import ar.edu.uade.skillswap.domain.publicacion.TipoPublicacion;
 import ar.edu.uade.skillswap.domain.publicacion.exception.PublicacionIncompletaException;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
@@ -18,6 +16,7 @@ import ar.edu.uade.skillswap.domain.shared.Puntaje;
 import ar.edu.uade.skillswap.domain.shared.TransicionInvalidaException;
 import ar.edu.uade.skillswap.infrastructure.memoria.PerfilRepositoryEnMemoria;
 import ar.edu.uade.skillswap.infrastructure.memoria.PublicacionRepositoryEnMemoria;
+import ar.edu.uade.skillswap.infrastructure.memoria.UnidadDeTrabajoEnMemoria;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -45,8 +44,9 @@ class PublicacionServiceTest {
     private static final DatosPublicacionCommand COMPLETA = new DatosPublicacionCommand("Mentoría de Java",
             "Revisión de código", "Programación", Modalidad.REMOTA, Duration.ofHours(1), 2, 100L, Set.of("java"));
 
-    private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria();
-    private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria();
+    private final UnidadDeTrabajoEnMemoria unidadDeTrabajo = new UnidadDeTrabajoEnMemoria();
+    private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria(unidadDeTrabajo);
+    private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria(unidadDeTrabajo);
     private final PublicacionService service =
             new PublicacionService(publicaciones, perfiles, Clock.fixed(AHORA, ZoneOffset.UTC));
 
@@ -69,7 +69,7 @@ class PublicacionServiceTest {
     }
 
     private String estadoGuardado(PublicacionDTO publicacion) {
-        return service.verPublicacion(publicacion.id()).estado();
+        return service.verPublicacion(ANA, publicacion.id()).estado();
     }
 
     @Nested
@@ -108,17 +108,6 @@ class PublicacionServiceTest {
             assertEquals(List.of("precio", "al menos una franja de disponibilidad"), error.faltantes());
             assertEquals("BORRADOR", estadoGuardado(borrador));
             assertNull(borrador.precioFinal());
-        }
-
-        @Test
-        void elTipoDePublicacionTieneQueCoincidirConElPerfil() {
-            var desafioDeAna = Publicacion.crearBorrador(ANA, TipoPublicacion.DESAFIO);
-            desafioDeAna.editar("Desafío", "Detalle", "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1,
-                    null, Set.of());
-            publicaciones.save(desafioDeAna);
-
-            assertThrows(TipoDePerfilIncompatibleException.class,
-                    () -> service.publicar(ANA, desafioDeAna.id().valor().toString()));
         }
 
         @Test
@@ -162,8 +151,22 @@ class PublicacionServiceTest {
         }
 
         @Test
+        void unBorradorOUnaPausadaSoloLaVeSuAutor() {
+            var borrador = borradorConFranja();
+            assertEquals("BORRADOR", service.verPublicacion(ANA, borrador.id()).estado());
+            assertThrows(RecursoNoEncontradoException.class, () -> service.verPublicacion(OTRO, borrador.id()));
+
+            service.publicar(ANA, borrador.id());
+            assertEquals("PUBLICADA", service.verPublicacion(OTRO, borrador.id()).estado());
+
+            service.pausar(ANA, borrador.id(), "vacaciones");
+            assertThrows(RecursoNoEncontradoException.class, () -> service.verPublicacion(OTRO, borrador.id()));
+            assertEquals("PAUSADA", service.verPublicacion(ANA, borrador.id()).estado());
+        }
+
+        @Test
         void unaPublicacionInexistenteSeInformaComoNoEncontrada() {
-            assertThrows(RecursoNoEncontradoException.class, () -> service.verPublicacion("no-es-un-id"));
+            assertThrows(RecursoNoEncontradoException.class, () -> service.verPublicacion(ANA, "no-es-un-id"));
             assertThrows(RecursoNoEncontradoException.class,
                     () -> service.publicar(ANA, "00000000-0000-0000-0000-000000000000"));
         }
