@@ -12,4 +12,9 @@ public record Completada() implements EstadoContratacion {
     public boolean admiteCalificacion() {
         return true;
     }
+
+    @Override
+    public boolean ocupaCupo() {
+        return true;
+    }
 }

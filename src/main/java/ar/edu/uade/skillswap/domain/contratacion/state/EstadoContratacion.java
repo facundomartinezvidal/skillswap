@@ -42,6 +42,11 @@ public sealed interface EstadoContratacion
         return false;
     }
 
+    /** Si la contratación tiene un lugar tomado en su franja. Se reserva al aceptar. */
+    default boolean ocupaCupo() {
+        return false;
+    }
+
     /** Calificar no cambia el estado; solo se admite cuando la contratación terminó. */
     default boolean admiteCalificacion() {
         return false;

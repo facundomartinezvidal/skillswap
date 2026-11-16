@@ -26,4 +26,9 @@ public record Borrador() implements EstadoPublicacion {
     public boolean admitePromociones() {
         return true;
     }
+
+    @Override
+    public boolean esVisibleParaTodos() {
+        return false;
+    }
 }

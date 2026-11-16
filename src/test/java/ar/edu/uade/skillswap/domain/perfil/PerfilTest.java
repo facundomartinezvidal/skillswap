@@ -237,8 +237,11 @@ class PerfilTest {
 
         @Test
         void soloRegistrarCalificacionPuedeCambiarLaReputacion() {
+            // Solo métodos de instancia: Perfil.reconstruir recibe la reputación guardada, pero arma un
+            // perfil nuevo desde el repositorio; no cambia la de un perfil existente.
             var publicos = Arrays.stream(Perfil.class.getMethods())
                     .filter(m -> m.getDeclaringClass() == Perfil.class)
+                    .filter(m -> !Modifier.isStatic(m.getModifiers()))
                     .toList();
 
             var queRecibenReputacionOPuntaje = publicos.stream()
