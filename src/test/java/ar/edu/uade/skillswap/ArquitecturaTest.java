@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * el mock, los modelos de vista, JPA ni Swing. La aplicación solo conoce al dominio: tampoco depende
  * de la infraestructura ni de la presentación. Se revisa el texto de cada fuente para detectar tanto
  * imports como nombres completamente calificados. Los controllers solo conocen Services, DTOs, modelos de
- * vista y tipos simples del dominio.
+ * vista y tipos simples del dominio. La infraestructura no lanza excepciones de negocio.
  */
 class ArquitecturaTest {
 
@@ -130,6 +130,43 @@ class ArquitecturaTest {
         var violaciones = violaciones(MAIN.resolve("domain/notificacion"), PROHIBIDOS_EN_NOTIFICACION);
 
         assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
+    /**
+     * La infraestructura no toma decisiones de negocio: no lanza excepciones del dominio ni las de negocio de
+     * la aplicación. Solo puede traducir un error técnico a {@code ConflictoDeConcurrenciaException}.
+     */
+    @Test
+    void laInfraestructuraNoLanzaExcepcionesDeNegocio() throws IOException {
+        var deNegocio = new ArrayList<String>();
+        for (var fuente : fuentes(MAIN.resolve("domain"))) {
+            agregarSiEsExcepcion(fuente, deNegocio);
+        }
+        for (var fuente : fuentes(MAIN.resolve("application"))) {
+            agregarSiEsExcepcion(fuente, deNegocio);
+        }
+        deNegocio.remove("ConflictoDeConcurrenciaException");
+        assertFalse(deNegocio.isEmpty(), "No se encontraron excepciones de negocio");
+
+        var violaciones = new ArrayList<String>();
+        var lanzadas = Pattern.compile("throw\\s+new\\s+(\\w+)");
+        for (var fuente : fuentes(MAIN.resolve("infrastructure"))) {
+            var throwNew = lanzadas.matcher(Files.readString(fuente));
+            while (throwNew.find()) {
+                if (deNegocio.contains(throwNew.group(1))) {
+                    violaciones.add(fuente + " lanza " + throwNew.group(1));
+                }
+            }
+        }
+
+        assertTrue(violaciones.isEmpty(), String.join(System.lineSeparator(), violaciones));
+    }
+
+    private static void agregarSiEsExcepcion(Path fuente, List<String> excepciones) {
+        var nombre = fuente.getFileName().toString().replace(".java", "");
+        if (nombre.endsWith("Exception")) {
+            excepciones.add(nombre);
+        }
     }
 
     private static List<String> violaciones(Path directorio, List<String> prohibidos) throws IOException {
