@@ -81,8 +81,10 @@ public class PublicacionService {
         return guardar(publicacion);
     }
 
+    /** Igual que al publicar: un perfil dado de baja no vuelve a poner la publicación en PUBLICADA. */
     public PublicacionDTO reanudar(String userId, String publicacionId) {
         var publicacion = buscarPropia(userId, publicacionId, "reanudar");
+        perfilActivo(userId, "reanudar");
         publicacion.reanudar(userId, ahora());
         return guardar(publicacion);
     }
