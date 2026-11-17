@@ -93,13 +93,13 @@ public class BackendJpa implements AutoCloseable {
 
         perfilService = new PerfilService(perfiles, wallets, publicaciones, contrataciones, identidad,
                 unidadDeTrabajo, bonoBienvenida, clock);
-        publicacionService = new PublicacionService(publicaciones, perfiles, clock);
+        publicacionService = new PublicacionService(publicaciones, perfiles, unidadDeTrabajo, clock);
         busquedaService = new BusquedaService(new BuscadorPublicacionesJpa(unidadDeTrabajo), publicaciones, perfiles,
                 estrategia.apply(perfiles));
         contratacionService = new ContratacionService(contrataciones, publicaciones, wallets, perfiles,
                 new RetencionDePagos(), new PoliticaReintegroFactory(ReintegroPorAnticipacion.conUmbralesPorDefecto()),
                 unidadDeTrabajo, publicador, clock);
-        walletService = new WalletService(wallets, clock);
+        walletService = new WalletService(wallets, unidadDeTrabajo, clock);
         notificacionService = new NotificacionService(notificaciones, unidadDeTrabajo);
     }
 
