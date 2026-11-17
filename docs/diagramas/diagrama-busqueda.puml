@@ -1,0 +1,99 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo busqueda (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "EstrategiaRecomendacion" as EstrategiaRecomendacion <<Strategy>> #EEEEEE
+    interface "BuscadorPublicaciones" as BuscadorPublicaciones #EEEEEE
+  }
+  package "busqueda" as pkg_Application_busqueda {
+    class "BusquedaService" as BusquedaService {
+      -buscador: BuscadorPublicaciones
+      -publicacionRepository: PublicacionRepository
+      -perfilRepository: PerfilRepository
+      -estrategia: EstrategiaRecomendacion
+      +buscar(criterios: CriteriosBusqueda, pagina: PaginaSolicitada): Pagina<PublicacionDTO>
+      +recomendar(userId: String, cantidad: int): List<PublicacionDTO>
+      +categorias(): List<String>
+    }
+    class "CriteriosBusqueda" as CriteriosBusqueda <<record>> {
+      +texto: String
+      +categoria: String
+      +modalidad: Modalidad
+      +precioMinimo: Long
+      +precioMaximo: Long
+      +habilidad: String
+      +reputacionMinima: Double
+      +orden: OrdenBusqueda
+    }
+    enum "OrdenBusqueda" as OrdenBusqueda {
+      RELEVANCIA
+      MEJOR_REPUTACION
+      MENOR_PRECIO
+      MAS_RECIENTE
+    }
+    class "AfinidadPorHabilidades" as AfinidadPorHabilidades <<Strategy>> {
+      -perfilRepository: PerfilRepository
+      +recomendar(usuario: Perfil, candidatas: List<Publicacion>, cantidad: int): List<Publicacion>
+    }
+    class "PopularidadReciente" as PopularidadReciente <<Strategy>> {
+      {static} +VENTANA_POR_DEFECTO: Duration
+      -contratacionRepository: ContratacionRepository
+      -clock: Clock
+      -ventana: Duration
+      +recomendar(usuario: Perfil, candidatas: List<Publicacion>, cantidad: int): List<Publicacion>
+    }
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "contratacion" as pkg_Domain_contratacion {
+    interface "ContratacionRepository" as ContratacionRepository #EEEEEE
+  }
+  package "perfil" as pkg_Domain_perfil {
+    interface "PerfilRepository" as PerfilRepository #EEEEEE
+  }
+  package "publicacion" as pkg_Domain_publicacion {
+    interface "PublicacionRepository" as PublicacionRepository #EEEEEE
+  }
+}
+
+AfinidadPorHabilidades ..|> EstrategiaRecomendacion
+PopularidadReciente ..|> EstrategiaRecomendacion
+BusquedaService --> "1" BuscadorPublicaciones : buscador
+BusquedaService --> "1" EstrategiaRecomendacion : estrategia
+BusquedaService --> "1" PerfilRepository : perfilRepository
+BusquedaService --> "1" PublicacionRepository : publicacionRepository
+AfinidadPorHabilidades --> "1" PerfilRepository : perfilRepository
+PopularidadReciente --> "1" ContratacionRepository : contratacionRepository
+BusquedaService ..> CriteriosBusqueda
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml

@@ -1,0 +1,211 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo shared (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "BuscadorPublicaciones" as BuscadorPublicaciones {
+      +buscar(criterios: CriteriosBusqueda, pagina: PaginaSolicitada): Pagina<Publicacion>
+    }
+    interface "EstrategiaRecomendacion" as EstrategiaRecomendacion <<Strategy>> {
+      +recomendar(usuario: Perfil, candidatas: List<Publicacion>, cantidad: int): List<Publicacion>
+    }
+    interface "SuscriptorEvento" as SuscriptorEvento <<Observer>> {
+      +actualizar(evento: EventoDominio): void
+    }
+    interface "EnvioNotificacion" as EnvioNotificacion {
+      +enviar(destinatarioId: String, titulo: String, detalle: String): void
+    }
+    interface "ServicioIdentidad" as ServicioIdentidad {
+      +existe(userId: String): boolean
+    }
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo {
+      +ejecutar(operacion: Supplier<T>): T
+    }
+  }
+  package "busqueda" as pkg_Application_busqueda {
+    class "AfinidadPorHabilidades" as AfinidadPorHabilidades <<Strategy>> #EEEEEE
+    class "PopularidadReciente" as PopularidadReciente <<Strategy>> #EEEEEE
+    class "BusquedaService" as BusquedaService #EEEEEE
+  }
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionService" as ContratacionService #EEEEEE
+  }
+  package "evento" as pkg_Application_evento {
+    class "PublicadorEventos" as PublicadorEventos <<Observer>> #EEEEEE
+  }
+  package "notificacion" as pkg_Application_notificacion {
+    class "NotificadorDeInteresados" as NotificadorDeInteresados <<Observer>> #EEEEEE
+    class "CanalEnvioFactory" as CanalEnvioFactory <<Simple Factory>> #EEEEEE
+    class "NotificacionService" as NotificacionService #EEEEEE
+  }
+  package "perfil" as pkg_Application_perfil {
+    class "PerfilDuplicadoException" as PerfilDuplicadoException #EEEEEE
+    class "PerfilService" as PerfilService #EEEEEE
+  }
+  package "shared" as pkg_Application_shared {
+    class "Ids" as Ids {
+      {static} +uuid(recurso: String, id: String): UUID
+    }
+    abstract class "ApplicationException" as ApplicationException
+    class "ConflictoDeConcurrenciaException" as ConflictoDeConcurrenciaException
+    class "PermisoDenegadoException" as PermisoDenegadoException
+    class "RecursoNoEncontradoException" as RecursoNoEncontradoException
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "contratacion" as pkg_Domain_contratacion {
+    class "Contratacion" as Contratacion #EEEEEE
+  }
+  package "contratacion.evento" as pkg_Domain_contratacion_evento {
+    class "ContratacionAceptada" as ContratacionAceptada <<record>> #EEEEEE
+    class "ContratacionCancelada" as ContratacionCancelada <<record>> #EEEEEE
+    class "PagoConfirmado" as PagoConfirmado <<record>> #EEEEEE
+    class "ReprogramacionAceptada" as ReprogramacionAceptada <<record>> #EEEEEE
+    class "ReprogramacionPropuesta" as ReprogramacionPropuesta <<record>> #EEEEEE
+    class "SesionCompletada" as SesionCompletada <<record>> #EEEEEE
+    class "SolicitudRecibida" as SolicitudRecibida <<record>> #EEEEEE
+  }
+  package "contratacion.exception" as pkg_Domain_contratacion_exception {
+    class "AccionNoPermitidaException" as AccionNoPermitidaException #EEEEEE
+    class "AutoSolicitudException" as AutoSolicitudException #EEEEEE
+    class "CalificacionDuplicadaException" as CalificacionDuplicadaException #EEEEEE
+    class "ReprogramacionInvalidaException" as ReprogramacionInvalidaException #EEEEEE
+  }
+  package "notificacion" as pkg_Domain_notificacion {
+    class "NotificacionAjenaException" as NotificacionAjenaException #EEEEEE
+  }
+  package "perfil" as pkg_Domain_perfil {
+    class "DisponibilidadInvalidaException" as DisponibilidadInvalidaException #EEEEEE
+    class "PerfilInactivoException" as PerfilInactivoException #EEEEEE
+    class "Perfil" as Perfil #EEEEEE
+  }
+  package "publicacion" as pkg_Domain_publicacion {
+    class "Publicacion" as Publicacion #EEEEEE
+  }
+  package "publicacion.exception" as pkg_Domain_publicacion_exception {
+    class "CupoAgotadoException" as CupoAgotadoException #EEEEEE
+    class "FranjaInvalidaException" as FranjaInvalidaException #EEEEEE
+    class "PublicacionIncompletaException" as PublicacionIncompletaException #EEEEEE
+  }
+  package "shared" as pkg_Domain_shared {
+    class "CambioEstado" as CambioEstado <<record>> {
+      +desde: String
+      +hacia: String
+      +fecha: Instant
+      +actorId: String
+      +motivo: String
+    }
+    abstract class "DomainException" as DomainException
+    interface "EventoDominio" as EventoDominio {
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+      +ocurridoEn(): Instant
+    }
+    class "Pagina<T>" as Pagina <<record>> {
+      +elementos: List<T>
+      +numero: int
+      +tamanio: int
+      +total: long
+      {static} +de(todos: List<T>, pagina: PaginaSolicitada): Pagina<T>
+      +map(transformacion: Function<T, R>): Pagina<R>
+      +totalPaginas(): int
+    }
+    class "PaginaSolicitada" as PaginaSolicitada <<record>> {
+      +numero: int
+      +tamanio: int
+      {static} +primera(tamanio: int): PaginaSolicitada
+      +desde(): int
+    }
+    class "Puntaje" as Puntaje <<record>> {
+      +valor: int
+      {static} +MINIMO: int
+      {static} +MAXIMO: int
+    }
+    class "SkillCoins" as SkillCoins <<record>> {
+      +valor: long
+      +sumar(otro: SkillCoins): SkillCoins
+      +restar(otro: SkillCoins): SkillCoins
+      +esMenorQue(otro: SkillCoins): boolean
+    }
+    class "TransicionInvalidaException" as TransicionInvalidaException {
+      -estado: String
+      -accion: String
+    }
+  }
+  package "wallet" as pkg_Domain_wallet {
+    class "SaldoInsuficienteException" as SaldoInsuficienteException #EEEEEE
+  }
+}
+
+PerfilDuplicadoException --|> ApplicationException
+ConflictoDeConcurrenciaException --|> ApplicationException
+PermisoDenegadoException --|> ApplicationException
+RecursoNoEncontradoException --|> ApplicationException
+AccionNoPermitidaException --|> DomainException
+AutoSolicitudException --|> DomainException
+CalificacionDuplicadaException --|> DomainException
+ReprogramacionInvalidaException --|> DomainException
+NotificacionAjenaException --|> DomainException
+DisponibilidadInvalidaException --|> DomainException
+PerfilInactivoException --|> DomainException
+CupoAgotadoException --|> DomainException
+FranjaInvalidaException --|> DomainException
+PublicacionIncompletaException --|> DomainException
+TransicionInvalidaException --|> DomainException
+SaldoInsuficienteException --|> DomainException
+AfinidadPorHabilidades ..|> EstrategiaRecomendacion
+PopularidadReciente ..|> EstrategiaRecomendacion
+NotificadorDeInteresados ..|> SuscriptorEvento
+ContratacionAceptada ..|> EventoDominio
+ContratacionCancelada ..|> EventoDominio
+PagoConfirmado ..|> EventoDominio
+ReprogramacionAceptada ..|> EventoDominio
+ReprogramacionPropuesta ..|> EventoDominio
+SesionCompletada ..|> EventoDominio
+SolicitudRecibida ..|> EventoDominio
+Contratacion "1" *-- "*" CambioEstado : historial
+Perfil "1" *-- "*" CambioEstado : historial
+Publicacion "1" *-- "*" CambioEstado : historial
+PublicadorEventos o-- "*" SuscriptorEvento : suscriptores
+Contratacion o-- "*" EventoDominio : eventos
+BusquedaService --> "1" BuscadorPublicaciones : buscador
+BusquedaService --> "1" EstrategiaRecomendacion : estrategia
+ContratacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+CanalEnvioFactory --> "1" EnvioNotificacion : email
+NotificacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+PerfilService --> "1" ServicioIdentidad : servicioIdentidad
+PerfilService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+SuscriptorEvento ..> EventoDominio
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml
