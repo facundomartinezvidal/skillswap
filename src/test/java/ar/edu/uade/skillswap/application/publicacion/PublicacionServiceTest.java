@@ -48,7 +48,7 @@ class PublicacionServiceTest {
     private final PublicacionRepositoryEnMemoria publicaciones = new PublicacionRepositoryEnMemoria(unidadDeTrabajo);
     private final PerfilRepositoryEnMemoria perfiles = new PerfilRepositoryEnMemoria(unidadDeTrabajo);
     private final PublicacionService service =
-            new PublicacionService(publicaciones, perfiles, Clock.fixed(AHORA, ZoneOffset.UTC));
+            new PublicacionService(publicaciones, perfiles, unidadDeTrabajo, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @BeforeEach
     void crearPerfiles() {

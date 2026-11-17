@@ -32,11 +32,14 @@ public class NotificacionService {
     }
 
     public void marcarLeida(String userId, String notificacionId) {
-        var id = new NotificacionId(Ids.uuid("notificación", notificacionId));
-        var notificacion = notificacionRepository.findById(id)
-                .orElseThrow(() -> new RecursoNoEncontradoException("notificación", notificacionId));
-        notificacion.marcarLeida(userId);
-        notificacionRepository.save(notificacion);
+        unidadDeTrabajo.ejecutar(() -> {
+            var id = new NotificacionId(Ids.uuid("notificación", notificacionId));
+            var notificacion = notificacionRepository.findById(id)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("notificación", notificacionId));
+            notificacion.marcarLeida(userId);
+            notificacionRepository.save(notificacion);
+            return null;
+        });
     }
 
     /** Marca todas en una transacción: o quedan todas leídas o ninguna. */
