@@ -1,0 +1,132 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo notificacion (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "SuscriptorEvento" as SuscriptorEvento <<Observer>> #EEEEEE
+    interface "EnvioNotificacion" as EnvioNotificacion #EEEEEE
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo #EEEEEE
+  }
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionService" as ContratacionService #EEEEEE
+  }
+  package "evento" as pkg_Application_evento {
+    class "PublicadorEventos" as PublicadorEventos <<Observer>> {
+      -suscriptores: List<SuscriptorEvento>
+      +suscribir(suscriptor: SuscriptorEvento): void
+      +publicar(eventos: List<EventoDominio>): void
+    }
+  }
+  package "notificacion" as pkg_Application_notificacion {
+    class "CanalEnvioFactory" as CanalEnvioFactory <<Simple Factory>> {
+      {static} -SIN_ENVIO: EnvioNotificacion
+      -email: EnvioNotificacion
+      -push: EnvioNotificacion
+      +para(canal: CanalNotificacion): EnvioNotificacion
+    }
+    class "NotificacionService" as NotificacionService {
+      -notificacionRepository: NotificacionRepository
+      -unidadDeTrabajo: UnidadDeTrabajo
+      +listar(userId: String, pagina: PaginaSolicitada): Pagina<NotificacionDTO>
+      +marcarLeida(userId: String, notificacionId: String): void
+      +marcarTodasLeidas(userId: String): void
+    }
+    class "NotificadorDeInteresados" as NotificadorDeInteresados <<Observer>> {
+      -notificacionRepository: NotificacionRepository
+      -perfilRepository: PerfilRepository
+      -canales: CanalEnvioFactory
+      +actualizar(evento: EventoDominio): void
+    }
+    class "NotificacionDTO" as NotificacionDTO <<record>> {
+      +id: String
+      +tipo: String
+      +titulo: String
+      +detalle: String
+      +fecha: Instant
+      +leida: boolean
+    }
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "notificacion" as pkg_Domain_notificacion {
+    class "Notificacion" as Notificacion {
+      -id: NotificacionId
+      -destinatarioId: String
+      -tipo: String
+      -titulo: String
+      -detalle: String
+      -fecha: Instant
+      -leida: boolean
+      {static} +para(destinatarioId: String, evento: EventoDominio): Notificacion
+      {static} +reconstruir(NotificacionId, String, String, String, String, Instant, boolean): Notificacion
+      +marcarLeida(actorId: String): void
+      +estaLeida(): boolean
+    }
+    class "NotificacionId" as NotificacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): NotificacionId
+    }
+    interface "NotificacionRepository" as NotificacionRepository {
+      +findById(id: NotificacionId): Optional<Notificacion>
+      +save(notificacion: Notificacion): void
+      +findByDestinatario(destinatarioId: String, pagina: PaginaSolicitada): Pagina<Notificacion>
+      +findNoLeidas(destinatarioId: String): List<Notificacion>
+    }
+    class "NotificacionAjenaException" as NotificacionAjenaException {
+      -actorId: String
+      -notificacionId: NotificacionId
+    }
+  }
+  package "perfil" as pkg_Domain_perfil {
+    interface "PerfilRepository" as PerfilRepository #EEEEEE
+  }
+  package "shared" as pkg_Domain_shared {
+    abstract class "DomainException" as DomainException #EEEEEE
+  }
+}
+
+NotificacionAjenaException --|> DomainException
+NotificadorDeInteresados ..|> SuscriptorEvento
+PublicadorEventos o-- "*" SuscriptorEvento : suscriptores
+ContratacionService --> "1" PublicadorEventos : publicadorEventos
+CanalEnvioFactory --> "1" EnvioNotificacion : email
+NotificacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+NotificacionService --> "1" NotificacionRepository : notificacionRepository
+NotificadorDeInteresados --> "1" CanalEnvioFactory : canales
+NotificadorDeInteresados --> "1" NotificacionRepository : notificacionRepository
+NotificadorDeInteresados --> "1" PerfilRepository : perfilRepository
+NotificacionService ..> NotificacionDTO
+NotificadorDeInteresados ..> Notificacion
+NotificacionRepository ..> Notificacion
+NotificacionAjenaException ..> Notificacion
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml

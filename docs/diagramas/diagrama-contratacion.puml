@@ -1,0 +1,448 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo contratacion (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo #EEEEEE
+  }
+  package "busqueda" as pkg_Application_busqueda {
+    class "PopularidadReciente" as PopularidadReciente <<Strategy>> #EEEEEE
+  }
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionMapper" as ContratacionMapper_contratacion
+    class "ContratacionService" as ContratacionService {
+      -contratacionRepository: ContratacionRepository
+      -publicacionRepository: PublicacionRepository
+      -walletRepository: WalletRepository
+      -perfilRepository: PerfilRepository
+      -retencionDePagos: RetencionDePagos
+      -politicaReintegroFactory: PoliticaReintegroFactory
+      -unidadDeTrabajo: UnidadDeTrabajo
+      -publicadorEventos: PublicadorEventos
+      -clock: Clock
+      +solicitar(command: SolicitarContratacionCommand): ContratacionDTO
+      +aceptar(userId: String, contratacionId: String): ContratacionDTO
+      +rechazar(userId: String, contratacionId: String, motivo: String): ContratacionDTO
+      +pagar(userId: String, contratacionId: String): ContratacionDTO
+      +iniciar(userId: String, contratacionId: String): ContratacionDTO
+      +completar(userId: String, contratacionId: String): ContratacionDTO
+      +cancelar(userId: String, contratacionId: String, motivo: String): ContratacionDTO
+      +proponerReprogramacion(String, String, String): ContratacionDTO
+      +aceptarReprogramacion(userId: String, contratacionId: String): ContratacionDTO
+      +rechazarReprogramacion(userId: String, contratacionId: String): ContratacionDTO
+      +calificar(String, String, int, String): CalificacionDTO
+      +listarContrataciones(userId: String, pagina: PaginaSolicitada): Pagina<ContratacionDTO>
+      +verContratacion(userId: String, contratacionId: String): ContratacionDTO
+    }
+    class "CalificacionDTO" as CalificacionDTO <<record>> {
+      +autorId: String
+      +destinatarioId: String
+      +puntaje: int
+      +comentario: String
+      +fecha: Instant
+    }
+    class "CambioEstadoDTO" as CambioEstadoDTO <<record>> {
+      +desde: String
+      +hacia: String
+      +fecha: Instant
+      +actorId: String
+      +motivo: String
+    }
+    class "ContratacionDTO" as ContratacionDTO <<record>> {
+      +id: String
+      +publicacionId: String
+      +tituloPublicacion: String
+      +clienteId: String
+      +proveedorId: String
+      +franjaId: String
+      +inicioSesion: Instant
+      +precioAcordado: long
+      +estado: String
+      +propuesta: PropuestaReprogramacionDTO
+      +reintegro: ReintegroDTO
+      +historial: List<CambioEstadoDTO>
+      +calificaciones: List<CalificacionDTO>
+    }
+    class "PropuestaReprogramacionDTO" as PropuestaReprogramacionDTO <<record>> {
+      +propuestaPor: String
+      +franjaId: String
+      +inicio: Instant
+    }
+    class "ReintegroDTO" as ReintegroDTO <<record>> {
+      +alCliente: long
+      +alProveedor: long
+    }
+    class "SolicitarContratacionCommand" as SolicitarContratacionCommand <<record>> {
+      +clienteId: String
+      +publicacionId: String
+      +franjaId: String
+      +mensaje: String
+      +objetivo: String
+    }
+  }
+  package "evento" as pkg_Application_evento {
+    class "PublicadorEventos" as PublicadorEventos <<Observer>> #EEEEEE
+  }
+  package "perfil" as pkg_Application_perfil {
+    class "PerfilService" as PerfilService #EEEEEE
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "contratacion" as pkg_Domain_contratacion {
+    class "Calificacion" as Calificacion <<record>> {
+      +id: CalificacionId
+      +autorId: String
+      +destinatarioId: String
+      +puntaje: Puntaje
+      +comentario: String
+      +fecha: Instant
+    }
+    class "CalificacionId" as CalificacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): CalificacionId
+    }
+    class "Contratacion" as Contratacion {
+      -id: ContratacionId
+      -publicacionId: PublicacionId
+      -clienteId: String
+      -proveedorId: String
+      -solicitud: Solicitud
+      -franjaId: FranjaId
+      -inicioSesion: Instant
+      -precioAcordado: SkillCoins
+      -estado: EstadoContratacion
+      -propuesta: PropuestaReprogramacion
+      -reintegro: Reintegro
+      -historial: List<CambioEstado>
+      -calificaciones: List<Calificacion>
+      -eventos: List<EventoDominio>
+      {static} +solicitar(String, String, PublicacionId, Solicitud, Instant, SkillCoins, …): Contratacion
+      {static} +reconstruir(ContratacionId, PublicacionId, String, String, Solicitud, …): Contratacion
+      +aceptar(actorId: String, ahora: Instant): void
+      +rechazar(actorId: String, motivo: String, ahora: Instant): void
+      +pagar(actorId: String, ahora: Instant): void
+      +iniciar(actorId: String, ahora: Instant): void
+      +completar(actorId: String, ahora: Instant): void
+      +cancelar(String, String, PoliticaReintegro, Instant): Reintegro
+      +proponerReprogramacion(String, FranjaId, Instant, Instant): void
+      +aceptarReprogramacion(actorId: String, ahora: Instant): FranjaId
+      +rechazarReprogramacion(actorId: String, ahora: Instant): void
+      +calificar(autorId: String, puntaje: Puntaje, comentario: String, ahora: Instant): Calificacion
+      +ocupaCupo(): boolean
+      +esParticipante(userId: String): boolean
+      +extraerEventos(): List<EventoDominio>
+    }
+    class "ContratacionId" as ContratacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): ContratacionId
+    }
+    interface "ContratacionRepository" as ContratacionRepository {
+      +findById(id: ContratacionId): Optional<Contratacion>
+      +save(contratacion: Contratacion): void
+      +findByParticipante(userId: String, pagina: PaginaSolicitada): Pagina<Contratacion>
+      +countCompletadasDe(userId: String): long
+      +countAceptadasDesde(desde: Instant): Map<PublicacionId, Long>
+    }
+    class "PropuestaReprogramacion" as PropuestaReprogramacion <<record>> {
+      +propuestaPor: String
+      +franjaId: FranjaId
+      +inicio: Instant
+    }
+    class "Reintegro" as Reintegro <<record>> {
+      +alCliente: SkillCoins
+      +alProveedor: SkillCoins
+      {static} +cero(): Reintegro
+    }
+    class "Solicitud" as Solicitud <<record>> {
+      +mensaje: String
+      +objetivo: String
+      +franjaElegida: FranjaId
+    }
+  }
+  package "contratacion.evento" as pkg_Domain_contratacion_evento {
+    class "ContratacionAceptada" as ContratacionAceptada <<record>> {
+      +contratacionId: ContratacionId
+      +clienteId: String
+      +proveedorId: String
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+    class "ContratacionCancelada" as ContratacionCancelada <<record>> {
+      +contratacionId: ContratacionId
+      +canceladaPor: String
+      +contraparteId: String
+      +motivo: String
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+    class "PagoConfirmado" as PagoConfirmado <<record>> {
+      +contratacionId: ContratacionId
+      +clienteId: String
+      +proveedorId: String
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+    class "ReprogramacionAceptada" as ReprogramacionAceptada <<record>> {
+      +contratacionId: ContratacionId
+      +propuestaPor: String
+      +aceptadaPor: String
+      +nuevoInicio: Instant
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+    class "ReprogramacionPropuesta" as ReprogramacionPropuesta <<record>> {
+      +contratacionId: ContratacionId
+      +propuestaPor: String
+      +contraparteId: String
+      +nuevoInicio: Instant
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+    class "SesionCompletada" as SesionCompletada <<record>> {
+      +contratacionId: ContratacionId
+      +clienteId: String
+      +proveedorId: String
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+    class "SolicitudRecibida" as SolicitudRecibida <<record>> {
+      +contratacionId: ContratacionId
+      +clienteId: String
+      +proveedorId: String
+      +ocurridoEn: Instant
+      +tipo(): String
+      +interesados(): List<String>
+      +titulo(): String
+      +detalle(): String
+    }
+  }
+  package "contratacion.exception" as pkg_Domain_contratacion_exception {
+    class "AccionNoPermitidaException" as AccionNoPermitidaException {
+      -actorId: String
+      -accion: String
+    }
+    class "AutoSolicitudException" as AutoSolicitudException
+    class "CalificacionDuplicadaException" as CalificacionDuplicadaException {
+      -autorId: String
+    }
+    class "ReprogramacionInvalidaException" as ReprogramacionInvalidaException
+  }
+  package "contratacion.state" as pkg_Domain_contratacion_state {
+    class "Aceptada" as Aceptada <<record>> <<State>> {
+      +nombre(): String
+      +pagar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+      +admiteReprogramacion(): boolean
+      +ocupaCupo(): boolean
+    }
+    class "Cancelada" as Cancelada_contratacion_state <<record>> <<State>> {
+      +nombre(): String
+    }
+    class "Completada" as Completada <<record>> <<State>> {
+      +nombre(): String
+      +admiteCalificacion(): boolean
+      +ocupaCupo(): boolean
+    }
+    class "Confirmada" as Confirmada <<record>> <<State>> {
+      +nombre(): String
+      +iniciar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+      +admiteReprogramacion(): boolean
+      +ocupaCupo(): boolean
+    }
+    class "EnCurso" as EnCurso <<record>> <<State>> {
+      +nombre(): String
+      +completar(): EstadoContratacion
+      +ocupaCupo(): boolean
+    }
+    interface "EstadoContratacion" as EstadoContratacion <<State>> {
+      +nombre(): String
+      +aceptar(): EstadoContratacion
+      +rechazar(): EstadoContratacion
+      +pagar(): EstadoContratacion
+      +iniciar(): EstadoContratacion
+      +completar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+      +admiteReprogramacion(): boolean
+      +ocupaCupo(): boolean
+      +admiteCalificacion(): boolean
+    }
+    class "Pendiente" as Pendiente <<record>> <<State>> {
+      +nombre(): String
+      +aceptar(): EstadoContratacion
+      +rechazar(): EstadoContratacion
+      +cancelar(): EstadoContratacion
+    }
+    class "Rechazada" as Rechazada <<record>> <<State>> {
+      +nombre(): String
+    }
+  }
+  package "contratacion.strategy" as pkg_Domain_contratacion_strategy {
+    interface "PoliticaReintegro" as PoliticaReintegro <<Strategy>> {
+      +calcular(precio: SkillCoins, inicioSesion: Instant, ahora: Instant): Reintegro
+    }
+    class "PoliticaReintegroFactory" as PoliticaReintegroFactory <<Simple Factory>> {
+      -porAnticipacion: ReintegroPorAnticipacion
+      -total: ReintegroTotal
+      +paraCancelacion(contratacion: Contratacion, canceladorId: String): PoliticaReintegro
+    }
+    class "ReintegroPorAnticipacion" as ReintegroPorAnticipacion <<Strategy>> {
+      -para100: Duration
+      -para50: Duration
+      {static} +conUmbralesPorDefecto(): ReintegroPorAnticipacion
+      +calcular(precio: SkillCoins, inicioSesion: Instant, ahora: Instant): Reintegro
+    }
+    class "ReintegroTotal" as ReintegroTotal <<Strategy>> {
+      +calcular(precio: SkillCoins, inicioSesion: Instant, ahora: Instant): Reintegro
+    }
+  }
+  package "perfil" as pkg_Domain_perfil {
+    interface "PerfilRepository" as PerfilRepository #EEEEEE
+  }
+  package "publicacion" as pkg_Domain_publicacion {
+    interface "PublicacionRepository" as PublicacionRepository #EEEEEE
+  }
+  package "shared" as pkg_Domain_shared {
+    abstract class "DomainException" as DomainException #EEEEEE
+    interface "EventoDominio" as EventoDominio #EEEEEE
+    class "CambioEstado" as CambioEstado <<record>> #EEEEEE
+  }
+  package "wallet" as pkg_Domain_wallet {
+    class "RetencionDePagos" as RetencionDePagos #EEEEEE
+    interface "WalletRepository" as WalletRepository #EEEEEE
+  }
+}
+
+AccionNoPermitidaException --|> DomainException
+AutoSolicitudException --|> DomainException
+CalificacionDuplicadaException --|> DomainException
+ReprogramacionInvalidaException --|> DomainException
+ContratacionAceptada ..|> EventoDominio
+ContratacionCancelada ..|> EventoDominio
+PagoConfirmado ..|> EventoDominio
+ReprogramacionAceptada ..|> EventoDominio
+ReprogramacionPropuesta ..|> EventoDominio
+SesionCompletada ..|> EventoDominio
+SolicitudRecibida ..|> EventoDominio
+Aceptada ..|> EstadoContratacion
+Cancelada_contratacion_state ..|> EstadoContratacion
+Completada ..|> EstadoContratacion
+Confirmada ..|> EstadoContratacion
+EnCurso ..|> EstadoContratacion
+Pendiente ..|> EstadoContratacion
+Rechazada ..|> EstadoContratacion
+ReintegroPorAnticipacion ..|> PoliticaReintegro
+ReintegroTotal ..|> PoliticaReintegro
+Contratacion "1" *-- "*" Calificacion : calificaciones
+Contratacion "1" *-- "1" PropuestaReprogramacion : propuesta
+Contratacion "1" *-- "1" Reintegro : reintegro
+Contratacion "1" *-- "1" Solicitud : solicitud
+Contratacion "1" *-- "*" CambioEstado : historial
+Contratacion o-- "*" EventoDominio : eventos
+PopularidadReciente --> "1" ContratacionRepository : contratacionRepository
+ContratacionService --> "1" PublicadorEventos : publicadorEventos
+ContratacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+ContratacionService --> "1" ContratacionRepository : contratacionRepository
+ContratacionService --> "1" PoliticaReintegroFactory : politicaReintegroFactory
+ContratacionService --> "1" PerfilRepository : perfilRepository
+ContratacionService --> "1" PublicacionRepository : publicacionRepository
+ContratacionService --> "1" RetencionDePagos : retencionDePagos
+ContratacionService --> "1" WalletRepository : walletRepository
+ContratacionDTO --> "*" CalificacionDTO : calificaciones
+ContratacionDTO --> "*" CambioEstadoDTO : historial
+ContratacionDTO --> "1" PropuestaReprogramacionDTO : propuesta
+ContratacionDTO --> "1" ReintegroDTO : reintegro
+PerfilService --> "1" ContratacionRepository : contratacionRepository
+Contratacion --> "1" EstadoContratacion : estado
+PoliticaReintegroFactory --> "1" ReintegroPorAnticipacion : porAnticipacion
+PoliticaReintegroFactory --> "1" ReintegroTotal : total
+ContratacionMapper_contratacion ..> CalificacionDTO
+ContratacionMapper_contratacion ..> CambioEstadoDTO
+ContratacionMapper_contratacion ..> ContratacionDTO
+ContratacionMapper_contratacion ..> PropuestaReprogramacionDTO
+ContratacionMapper_contratacion ..> ReintegroDTO
+ContratacionService ..> ContratacionMapper_contratacion
+ContratacionService ..> CalificacionDTO
+ContratacionService ..> ContratacionDTO
+ContratacionService ..> SolicitarContratacionCommand
+ContratacionService ..> Contratacion
+ContratacionService ..> Solicitud
+Contratacion ..> ContratacionAceptada
+Contratacion ..> ContratacionCancelada
+Contratacion ..> PagoConfirmado
+Contratacion ..> ReprogramacionAceptada
+Contratacion ..> ReprogramacionPropuesta
+Contratacion ..> SesionCompletada
+Contratacion ..> SolicitudRecibida
+Contratacion ..> Pendiente
+Contratacion ..> PoliticaReintegro
+ContratacionRepository ..> Contratacion
+ContratacionAceptada ..> Contratacion
+ContratacionCancelada ..> Contratacion
+PagoConfirmado ..> Contratacion
+ReprogramacionAceptada ..> Contratacion
+ReprogramacionPropuesta ..> Contratacion
+SesionCompletada ..> Contratacion
+SolicitudRecibida ..> Contratacion
+Aceptada ..> Cancelada_contratacion_state
+Aceptada ..> Confirmada
+Confirmada ..> Cancelada_contratacion_state
+Confirmada ..> EnCurso
+EnCurso ..> Completada
+Pendiente ..> Aceptada
+Pendiente ..> Cancelada_contratacion_state
+Pendiente ..> Rechazada
+PoliticaReintegro ..> Reintegro
+PoliticaReintegroFactory ..> Contratacion
+PoliticaReintegroFactory ..> PoliticaReintegro
+ReintegroPorAnticipacion ..> Reintegro
+ReintegroTotal ..> Reintegro
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml

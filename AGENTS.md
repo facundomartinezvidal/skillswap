@@ -38,52 +38,63 @@ La consigna completa está transcripta en [`docs/consigna/`](docs/consigna/), co
 | | |
 |---|---|
 | Lenguaje | Java 17 (`maven.compiler.release=17`). El IDE puede tener un JDK más nuevo, pero el código tiene que compilar con 17. |
-| Build | Maven (`pom.xml`), sin wrapper |
+| Build | Maven (`pom.xml`), sin wrapper; JaCoCo 0.8.13 para cobertura |
 | ORM | Hibernate ORM 7.2.1 (JPA) |
 | Base de datos | MySQL (`mysql-connector-j` 9.7.0) |
 | Migraciones | Flyway 12.8.1 (`flyway-mysql`) |
-| Tests | JUnit Jupiter 6.1.0 |
+| Tests | JUnit Jupiter 6.1.0 y Testcontainers (MySQL) |
 | UI | Swing |
 
 ## Comandos
 
 ```bash
+docker compose up -d                                   # MySQL de desarrollo en el puerto 3307
 mvn compile
-mvn test
-mvn exec:java
-mvn exec:java -Dexec.args="--screenshot out.png"
+mvn test                                               # reporte de cobertura en target/site/jacoco
+mvn verify                                             # además exige 80 % de líneas en dominio + aplicación
+mvn compile exec:java                                  # UI con BackendJpa (MySQL, migra y carga la demo)
+mvn compile exec:java -Dexec.args="--memoria"          # UI con BackendEnMemoria (sin MySQL)
+mvn compile exec:java -Dexec.args="--memoria --screenshot out.png"
 ```
 
 - `mvn exec:java` abre la UI (main: `ar.edu.uade.skillswap.SkillSwapApplication`).
 - `--screenshot <archivo>` renderiza la pantalla de inicio a un PNG sin abrir la ventana.
+- Detalle en el `README.md` y guion de la demo en `docs/demo.md`.
 
 ## Estado actual del código
 
 ```
 src/main/java/ar/edu/uade/skillswap/
-├── SkillSwapApplication.java          # main: instala Theme, crea MockSkillSwapControllers y abre la ventana
+├── SkillSwapApplication.java          # main: elige BackendJpa o --memoria, carga DatosDemo y abre la UI
 ├── domain/                            # Dominio Java puro (completo), con los puertos de repositorio
 ├── application/                       # Casos de uso: un Service por flujo, DTOs y puertos (ver docs/arquitectura.md)
 ├── infrastructure/                    # memoria/ (repos y unidad de trabajo en memoria), notificacion/ (adapters),
-│                                      # identidad/ (simulada), configuracion/BackendEnMemoria (composition root)
-├── controllers/UiControllers.java     # CONTRATO entre la UI y el backend (interfaces de controllers)
-├── mock/MockSkillSwapControllers.java # implementación en memoria con datos de demo
+│                                      # identidad/ (simulada), persistencia/ (JPA: entidades, mappers, repositorios,
+│                                      # UnidadDeTrabajoJpa, Migraciones), configuracion/ (BackendEnMemoria,
+│                                      # BackendJpa y DatosDemo)
+├── controllers/UiControllers.java     # CONTRATO de la cátedra entre la UI y el backend (no se modifica)
+├── controllers/*Operaciones, RecomendacionController, CalificacionController   # interfaces del equipo
+├── controllers/impl/                  # *ControllerImpl, SkillSwapControllers, ManejoDeErrores, ModelosMapper
+├── mock/MockSkillSwapControllers.java # mock original de la cátedra (main ya no lo usa)
 ├── model/Models.java                  # records/enums que viajan entre la UI y los controllers
 └── ui/                                # SkillSwapView (pantallas) y Theme (colores y fuentes)
-src/main/resources/db/migration/V1__esquema_inicial.sql   # esquema inicial (todavía no alineado con el dominio)
+src/main/resources/db/migration/V1__esquema_inicial.sql   # esquema Flyway, alineado con el dominio
+docker-compose.yml                                        # MySQL 8 de desarrollo (puerto 3307, skillswap/skillswap)
 src/test/java/ar/edu/uade/skillswap/
-├── ArquitecturaTest.java              # reglas de dependencias de domain y application
+├── ArquitecturaTest.java              # reglas de dependencias de domain, application, controllers e infrastructure
 ├── RecorridoCompletoTest.java         # la demo de punta a punta con BackendEnMemoria
-├── domain/  application/  infrastructure/
+├── domain/  application/  infrastructure/  controllers/   # controllers/CasosDeAceptacionTest: los 10 casos
 └── mock/MockSkillSwapControllersTest.java
 ```
 
 - `UiControllers` agrupa las sub-interfaces `BusquedaController`, `PublicacionController`, `ContratacionController`, `WalletController`, `NotificacionController` y `PerfilController`.
 - `Models` son **modelos de vista** (records inmutables): `Perfil`, `Publicacion`, `Contratacion`, `Movimiento`, `Notificacion`, `FiltrosBusqueda` y los enums `Modalidad`, `EstadoPublicacion` y `EstadoContratacion`. **No** son entidades de dominio ni entidades JPA, y no deben tener lógica de negocio.
 - `Modalidad` tiene `HIBRIDA` además de `REMOTA` y `PRESENCIAL`, aunque la consigna solo menciona remota y presencial.
-- El usuario activo está hardcodeado en la UI (`USER_ID = "user-mateo"`), simulando el login mock. `ServicioIdentidadSimulado` lo conoce.
-- **El dominio y la capa de aplicación están completos** (PRs #12 a #18). **Todavía no existen** la persistencia JPA (`persistence.xml`, entidades, repositorios JPA) ni los controllers reales: la UI sigue usando el mock. Mientras tanto, `BackendEnMemoria` arma todos los Services con la implementación en memoria.
-- `mvn test` corre 495 tests. El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md).
+- El usuario activo está hardcodeado en la UI (`USER_ID = "user-mateo"`), simulando el login mock. `ServicioIdentidadSimulado` lo conoce, junto con los demás usuarios de `DatosDemo`.
+- **El backend está completo** (PRs #12 a #24, encadenados): dominio, aplicación, persistencia JPA (`BackendJpa` contra MySQL con `DB_URL`, `DB_USER`, `DB_PASSWORD`; por defecto el MySQL del `docker-compose.yml`), controllers reales y la UI conectada. Sin argumentos la app usa MySQL; con `--memoria`, `BackendEnMemoria`. En los dos casos `DatosDemo` carga la demo una sola vez.
+- `mvn test` corre 564 tests. Los 24 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y quedan deshabilitados si Docker no está disponible. Cobertura de dominio + aplicación: 99,4 % de líneas y 95,3 % de ramas (JaCoCo). El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md) y las decisiones en [`docs/informe-decisiones.md`](docs/informe-decisiones.md).
+
+- **Pendientes:** lo que falta según la revisión contra la consigna (botón Calificar en la UI, bug de las contrataciones RECHAZADAS, orden "Más reciente", diagrama en StarUML, historias de usuario e informe en PDF) está en [`docs/pendientes-equipo.md`](docs/pendientes-equipo.md).
 
 ### Decisiones de dominio acordadas
 
@@ -100,21 +111,17 @@ Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y
 - **Eventos y notificaciones:** `Contratacion` registra un `EventoDominio` por cada operación válida (solicitud, aceptación, pago, reprogramación propuesta y aceptada, cancelación, sesión completada); cada evento declara sus interesados. El caso de uso los toma con `extraerEventos()` después de guardar. `Notificacion` es genérica y solo su destinatario la marca como leída; el canal no es parte de la notificación.
 - **Patrones implementados:** State (estados de publicación y contratación), Strategy (políticas de reintegro y recomendaciones), Simple Factory (política de reintegro y canal de envío), Decorator (promociones), Observer (`PublicadorEventos` y `NotificadorDeInteresados`) y Adapter (email, push e identidad simulados). Ver la tabla en `docs/arquitectura.md`.
 
-### Próximo hito: persistencia y controllers
+### Persistencia y controllers: acuerdos
 
-- **Persistencia (JPA y MySQL):**
-  - Implementar los repositorios del dominio, `BuscadorPublicaciones` (una consulta con join a perfiles, sin N+1) y `UnidadDeTrabajo` con `EntityTransaction`.
-  - Mapear con `reconstruir(...)`.
-  - Alinear `V1` con el dominio (identidad por `userId`, Wallet de garantía sin perfil, tipo de perfil).
-  - `@Version` en publicación (cupo) y en la Wallet de garantía.
-  - Armar otro composition root igual a `BackendEnMemoria`, con los repositorios JPA.
-- **Controllers:** implementar `UiControllers` sobre los Services de `BackendEnMemoria`. Mapear DTOs a `Models` y atrapar `DomainException` y `ApplicationException` de forma uniforme. Ver "Qué le falta al contrato actual" más abajo.
+- **Persistencia:** el esquema lo define solo Flyway (`V1`, `hbm2ddl=validate`); entidades JPA solo en infraestructura, con mappers que usan `reconstruir(...)`; `@Version` en publicación, contratación, wallet y perfil (la publicación con `OPTIMISTIC_FORCE_INCREMENT`); `UnidadDeTrabajoJpa` con `ThreadLocal<EntityManager>`; listados sin N+1 (ids de la página y después `join fetch`). Un cambio de esquema nuevo va en una `V2`.
+- **Controllers:** `UiControllers` no se modifica. Lo que la UI no expone va en las interfaces del equipo. Todos los errores pasan por `ManejoDeErrores` y salen como `OperacionRechazadaException`. `avanzar` decide según estado y rol. La infraestructura no lanza excepciones de negocio (lo verifica `ArquitecturaTest`).
 
 ### Capa de aplicación: acuerdos
 
 - Las firmas de los Services y los puertos (PR #12) son el contrato para persistencia y controllers. Todos los Services están implementados (PRs #14 a #17); un controller se conecta a un Service recién cuando su PR está mergeado.
 - Checklist que pidió la revisión, para código nuevo:
   - Las reglas que dependen del estado las responde el dominio, no una lista de nombres en el Service.
+  - Toda operación que modifica un agregado corre en una `UnidadDeTrabajo`, aunque toque uno solo: la lectura y el `save` tienen que estar en la misma transacción para que el `@Version` detecte los cambios concurrentes.
   - Adentro de una `UnidadDeTrabajo`, primero se modifican todos los agregados y los `save` van al final.
   - Los DTOs copian sus colecciones.
   - Los listados no hacen N+1 (`findByIds`, `findByUserIds`).
@@ -122,21 +129,9 @@ Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y
   - En los `reconstruir`, nulos con mensaje y colecciones vacías.
 - **Limitación conocida:** `PublicacionRepository.findPublicadas()` no tiene límite (las recomendaciones cargan todas las publicadas). Alcanza para el volumen del TP; con muchos datos, habría que acotar las candidatas en la consulta.
 
-### Qué le falta al contrato actual respecto de la consigna
+### Qué cubren las interfaces del equipo
 
-Al implementar, hay que extender `UiControllers` (o agregar interfaces) para cubrir:
-
-- `ContratacionController`: `aceptar`, `rechazar`, `pagar`, `iniciar`, `completar` y reprogramar. Hoy solo existen un `avanzar` genérico y `cancelar`.
-- Un `RecomendacionController` separado, con estrategias intercambiables.
-- `CalificacionController.calificar(...)`.
-- `PerfilController.crearPerfil(...)` y la edición del perfil (zona horaria, intereses, disponibilidad).
-- **Paginación** en todos los listados de consulta.
-- Filtros de búsqueda faltantes: rango de precio (hoy solo hay máximo), habilidad, reputación mínima y orden por fecha.
-- Datos de publicación faltantes: cupo, franjas de disponibilidad, tipo (oferta o desafío) y motivo de cancelación.
-- Solicitud con mensaje y franja elegida (hoy solo recibe el objetivo).
-- Preferencia de canal de notificación por usuario.
-
-Si se cambia el contrato, hay que adaptar `MockSkillSwapControllers` y `SkillSwapView` para que la app siga compilando y abriendo.
+Lo que la consigna pide y `UiControllers` no tenía ya está implementado y probado: `ContratacionOperaciones` (aceptar, rechazar, pagar, iniciar, completar, cancelar con motivo, reprogramar), `RecomendacionController`, `CalificacionController`, `PerfilOperaciones` (crear, editar, disponibilidad, canal y baja), `PublicacionOperaciones` (franjas y descuentos), `BusquedaOperaciones` (rango de precio, habilidad, reputación mínima, cuatro órdenes) y listados paginados (`PaginaVista<T>`). La UI de la cátedra no tiene botones para calificar, reprogramar ni cargar franjas.
 
 ## Convenciones
 

@@ -1,5 +1,6 @@
 package ar.edu.uade.skillswap.application.wallet;
 
+import ar.edu.uade.skillswap.application.shared.UnidadDeTrabajo;
 import ar.edu.uade.skillswap.application.shared.exception.PermisoDenegadoException;
 import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
 import ar.edu.uade.skillswap.application.wallet.dto.MovimientoDTO;
@@ -20,10 +21,12 @@ import java.util.Objects;
 public class WalletService {
 
     private final WalletRepository walletRepository;
+    private final UnidadDeTrabajo unidadDeTrabajo;
     private final Clock clock;
 
-    public WalletService(WalletRepository walletRepository, Clock clock) {
+    public WalletService(WalletRepository walletRepository, UnidadDeTrabajo unidadDeTrabajo, Clock clock) {
         this.walletRepository = Objects.requireNonNull(walletRepository);
+        this.unidadDeTrabajo = Objects.requireNonNull(unidadDeTrabajo);
         this.clock = Objects.requireNonNull(clock);
     }
 
@@ -37,12 +40,17 @@ public class WalletService {
         return walletRepository.findMovimientos(userId, pagina).map(WalletService::aDTO);
     }
 
-    /** Carga saldo de demostración y devuelve el saldo resultante. El importe tiene que ser mayor que 0. */
+    /**
+     * Carga saldo de demostración y devuelve el saldo resultante. El importe tiene que ser mayor que 0.
+     * Lee y guarda en una transacción, para no pisar un pago que se cruce con la carga.
+     */
     public long acreditarDemo(String userId, long importe) {
-        var wallet = buscar(userId);
-        wallet.acreditarDemo(new SkillCoins(importe), clock.instant());
-        walletRepository.save(wallet);
-        return wallet.saldo().valor();
+        return unidadDeTrabajo.ejecutar(() -> {
+            var wallet = buscar(userId);
+            wallet.acreditarDemo(new SkillCoins(importe), clock.instant());
+            walletRepository.save(wallet);
+            return wallet.saldo().valor();
+        });
     }
 
     private Wallet buscar(String userId) {

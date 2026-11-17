@@ -13,7 +13,8 @@ import java.util.Set;
 public class ServicioIdentidadSimulado implements ServicioIdentidad {
 
     /** Usuarios de la demo; {@code user-mateo} es el usuario activo de la UI de la cátedra. */
-    public static final Set<String> USUARIOS_DEMO = Set.of("user-mateo", "user-ana", "user-lucia", "user-acme");
+    public static final Set<String> USUARIOS_DEMO = Set.of("user-mateo", "user-ana", "user-lucia", "user-acme",
+            "user-sofia", "user-tomas", "user-camila", "user-nicolas", "user-laura", "user-martin");
 
     private final Set<String> usuarios;
 

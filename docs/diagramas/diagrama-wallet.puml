@@ -1,0 +1,130 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo wallet (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionService" as ContratacionService #EEEEEE
+  }
+  package "perfil" as pkg_Application_perfil {
+    class "PerfilService" as PerfilService #EEEEEE
+  }
+  package "wallet" as pkg_Application_wallet {
+    class "WalletService" as WalletService {
+      -walletRepository: WalletRepository
+      -clock: Clock
+      +consultarSaldo(userId: String): long
+      +listarMovimientos(userId: String, pagina: PaginaSolicitada): Pagina<MovimientoDTO>
+      +acreditarDemo(userId: String, importe: long): long
+    }
+    class "MovimientoDTO" as MovimientoDTO <<record>> {
+      +id: String
+      +tipo: TipoMovimiento
+      +importe: long
+      +saldoResultante: long
+      +concepto: String
+      +contratacionId: String
+      +fecha: Instant
+    }
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "shared" as pkg_Domain_shared {
+    abstract class "DomainException" as DomainException #EEEEEE
+  }
+  package "wallet" as pkg_Domain_wallet {
+    class "Movimiento" as Movimiento <<record>> {
+      +id: MovimientoId
+      +tipo: TipoMovimiento
+      +importe: SkillCoins
+      +saldoResultante: SkillCoins
+      +concepto: String
+      +contratacionId: ContratacionId
+      +fecha: Instant
+      +importeConSigno(): long
+    }
+    class "MovimientoId" as MovimientoId <<record>> {
+      +valor: UUID
+      {static} +generate(): MovimientoId
+    }
+    class "RetencionDePagos" as RetencionDePagos {
+      +retener(Wallet, Wallet, SkillCoins, ContratacionId, Instant): void
+      +liberarAlProveedor(Wallet, Wallet, SkillCoins, ContratacionId, Instant): void
+      +repartir(Wallet, Wallet, Wallet, SkillCoins, SkillCoins, SkillCoins, ContratacionId, …): void
+    }
+    enum "TipoMovimiento" as TipoMovimiento {
+      CREDITO
+      DEBITO
+      REINTEGRO
+      ACREDITACION_DEMO
+    }
+    class "Wallet" as Wallet {
+      {static} +TITULAR_GARANTIA: String
+      {static} -CONCEPTO_BONO: String
+      {static} -CONCEPTO_DEMO: String
+      -titularId: String
+      -saldo: SkillCoins
+      -movimientosNuevos: List<Movimiento>
+      {static} +abrir(titularId: String, bonoBienvenida: SkillCoins, ahora: Instant): Wallet
+      {static} +abrirGarantia(): Wallet
+      {static} +reconstruir(titularId: String, saldo: SkillCoins): Wallet
+      +debitar(SkillCoins, String, ContratacionId, Instant): Movimiento
+      +acreditar(SkillCoins, String, ContratacionId, Instant): Movimiento
+      +reintegrar(SkillCoins, String, ContratacionId, Instant): Movimiento
+      +acreditarDemo(importe: SkillCoins, ahora: Instant): Movimiento
+      +esGarantia(): boolean
+    }
+    interface "WalletRepository" as WalletRepository {
+      +findByTitular(titularId: String): Optional<Wallet>
+      +garantia(): Wallet
+      +save(wallet: Wallet): void
+      +findMovimientos(titularId: String, pagina: PaginaSolicitada): Pagina<Movimiento>
+    }
+    class "SaldoInsuficienteException" as SaldoInsuficienteException {
+      -saldo: SkillCoins
+      -importe: SkillCoins
+    }
+  }
+}
+
+SaldoInsuficienteException --|> DomainException
+Wallet "1" *-- "*" Movimiento : movimientosNuevos
+ContratacionService --> "1" RetencionDePagos : retencionDePagos
+ContratacionService --> "1" WalletRepository : walletRepository
+PerfilService --> "1" WalletRepository : walletRepository
+WalletService --> "1" WalletRepository : walletRepository
+WalletService ..> MovimientoDTO
+WalletService ..> Wallet
+RetencionDePagos ..> Wallet
+WalletRepository ..> Movimiento
+WalletRepository ..> Wallet
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml

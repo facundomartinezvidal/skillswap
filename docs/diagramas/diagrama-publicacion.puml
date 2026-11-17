@@ -1,0 +1,322 @@
+@startuml
+!pragma layout smetana
+set separator none
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam class {
+  BackgroundColor white
+  BorderColor #555555
+  ArrowColor #333333
+  BackgroundColor<<State>> #E3F2FD
+  BackgroundColor<<Strategy>> #E8F5E9
+  BackgroundColor<<Simple Factory>> #FFF3E0
+  BackgroundColor<<Decorator>> #F3E5F5
+  BackgroundColor<<Observer>> #FFFDE7
+  BackgroundColor<<Adapter>> #FCE4EC
+  BackgroundColor<<Entity>> #ECEFF1
+}
+hide empty members
+title SkillSwap - Módulo publicacion (dominio y aplicación)
+
+package "Application" as pkg_Application #F5FAFF {
+  package "busqueda" as pkg_Application_busqueda {
+    class "BusquedaService" as BusquedaService #EEEEEE
+  }
+  package "contratacion" as pkg_Application_contratacion {
+    class "ContratacionService" as ContratacionService #EEEEEE
+  }
+  package "perfil" as pkg_Application_perfil {
+    class "PerfilService" as PerfilService #EEEEEE
+    class "PerfilDTO" as PerfilDTO <<record>> #EEEEEE
+  }
+  package "publicacion" as pkg_Application_publicacion {
+    class "PublicacionMapper" as PublicacionMapper_publicacion {
+      {static} +aDTO(p: Publicacion, autor: Perfil): PublicacionDTO
+      {static} +aPromocion(promocion: PromocionDTO): Promocion
+    }
+    class "PublicacionService" as PublicacionService {
+      -publicacionRepository: PublicacionRepository
+      -perfilRepository: PerfilRepository
+      -clock: Clock
+      +crearBorrador(userId: String, datos: DatosPublicacionCommand): PublicacionDTO
+      +editar(userId: String, publicacionId: String, datos: DatosPublicacionCommand): PublicacionDTO
+      +agregarFranja(String, String, Instant, Instant): PublicacionDTO
+      +publicar(userId: String, publicacionId: String): PublicacionDTO
+      +pausar(userId: String, publicacionId: String, motivo: String): PublicacionDTO
+      +reanudar(userId: String, publicacionId: String): PublicacionDTO
+      +cerrar(userId: String, publicacionId: String, motivo: String): PublicacionDTO
+      +cancelar(userId: String, publicacionId: String, motivo: String): PublicacionDTO
+      +agregarPromocion(String, String, PromocionDTO): PublicacionDTO
+      +quitarPromocion(String, String, PromocionDTO): PublicacionDTO
+      +listarPropias(userId: String, pagina: PaginaSolicitada): Pagina<PublicacionDTO>
+      +verPublicacion(userId: String, publicacionId: String): PublicacionDTO
+    }
+    class "DatosPublicacionCommand" as DatosPublicacionCommand <<record>> {
+      +titulo: String
+      +descripcion: String
+      +categoria: String
+      +modalidad: Modalidad
+      +duracionEstimada: Duration
+      +cupo: int
+      +precioBase: Long
+      +etiquetas: Set<String>
+    }
+    class "FranjaDTO" as FranjaDTO <<record>> {
+      +id: String
+      +inicio: Instant
+      +fin: Instant
+      +lugaresLibres: int
+    }
+    class "PromocionDTO" as PromocionDTO <<record>> {
+      +tipo: Tipo
+      +valor: long
+    }
+    enum "PromocionDTO.Tipo" as PromocionDTO_Tipo {
+      PORCENTUAL
+      FIJO
+    }
+    class "PublicacionDTO" as PublicacionDTO <<record>> {
+      +id: String
+      +autorId: String
+      +autorNombre: String
+      +reputacionAutor: double
+      +tipo: TipoPublicacion
+      +titulo: String
+      +descripcion: String
+      +categoria: String
+      +modalidad: Modalidad
+      +duracionEstimada: Duration
+      +cupo: int
+      +precioBase: Long
+      +precioFinal: Long
+      +etiquetas: Set<String>
+      +estado: String
+      +motivoCancelacion: String
+      +franjas: List<FranjaDTO>
+      +promociones: List<PromocionDTO>
+    }
+  }
+}
+
+package "Domain" as pkg_Domain #FFFDF5 {
+  package "perfil" as pkg_Domain_perfil {
+    interface "PerfilRepository" as PerfilRepository #EEEEEE
+  }
+  package "publicacion" as pkg_Domain_publicacion {
+    class "FranjaDisponibilidad" as FranjaDisponibilidad {
+      -id: FranjaId
+      -inicio: Instant
+      -fin: Instant
+      -reservados: int
+      {static} +reconstruir(FranjaId, Instant, Instant, int): FranjaDisponibilidad
+      +estaOcupada(cupo: int): boolean
+    }
+    class "FranjaId" as FranjaId <<record>> {
+      +valor: UUID
+      {static} +generate(): FranjaId
+    }
+    enum "Modalidad" as Modalidad {
+      REMOTA
+      PRESENCIAL
+      HIBRIDA
+    }
+    class "Publicacion" as Publicacion {
+      -id: PublicacionId
+      -autorId: String
+      -tipo: TipoPublicacion
+      -titulo: String
+      -descripcion: String
+      -categoria: String
+      -modalidad: Modalidad
+      -duracionEstimada: Duration
+      -cupo: int
+      -precioBase: SkillCoins
+      -etiquetas: Set<String>
+      -estado: EstadoPublicacion
+      -motivoCancelacion: String
+      -franjas: List<FranjaDisponibilidad>
+      -promociones: List<Promocion>
+      -historial: List<CambioEstado>
+      {static} +crearBorrador(autorId: String, tipo: TipoPublicacion): Publicacion
+      {static} +reconstruir(PublicacionId, String, TipoPublicacion, String, String, String, …): Publicacion
+      +editar(String, String, String, Modalidad, Duration, int, SkillCoins, Set<String>): void
+      +agregarFranja(inicio: Instant, fin: Instant): FranjaId
+      +publicar(actorId: String, ahora: Instant): void
+      +pausar(actorId: String, motivo: String, ahora: Instant): void
+      +reanudar(actorId: String, ahora: Instant): void
+      +cerrar(actorId: String, motivo: String, ahora: Instant): void
+      +cancelar(actorId: String, motivo: String, ahora: Instant): void
+      +admiteSolicitudes(): boolean
+      +franjaParaSolicitar(franjaId: FranjaId, ahora: Instant): FranjaDisponibilidad
+      +franjaDisponible(franjaId: FranjaId, ahora: Instant): FranjaDisponibilidad
+      +reservarCupo(franjaId: FranjaId): void
+      +esVisiblePara(userId: String): boolean
+      +liberarCupo(franjaId: FranjaId): void
+      +agregarPromocion(promocion: Promocion): void
+      +quitarPromocion(promocion: Promocion): void
+      +precioFinal(): SkillCoins
+    }
+    class "PublicacionId" as PublicacionId <<record>> {
+      +valor: UUID
+      {static} +generate(): PublicacionId
+    }
+    interface "PublicacionRepository" as PublicacionRepository {
+      +findById(id: PublicacionId): Optional<Publicacion>
+      +save(publicacion: Publicacion): void
+      +findByAutor(autorId: String, pagina: PaginaSolicitada): Pagina<Publicacion>
+      +findActivasByAutor(autorId: String): List<Publicacion>
+      +findByIds(ids: Collection<PublicacionId>): List<Publicacion>
+      +findPublicadas(): List<Publicacion>
+      +categorias(): List<String>
+    }
+    enum "TipoPublicacion" as TipoPublicacion {
+      OFERTA
+      DESAFIO
+    }
+  }
+  package "publicacion.decorator" as pkg_Domain_publicacion_decorator {
+    class "DescuentoFijo" as DescuentoFijo <<record>> <<Decorator>> {
+      +monto: SkillCoins
+      +aplicar(precio: SkillCoins): SkillCoins
+    }
+    class "DescuentoPorcentual" as DescuentoPorcentual <<record>> <<Decorator>> {
+      +porcentaje: int
+      +aplicar(precio: SkillCoins): SkillCoins
+    }
+    interface "Precio" as Precio <<Decorator>> {
+      +valor(): SkillCoins
+    }
+    class "PrecioBase" as PrecioBase <<record>> <<Decorator>> {
+      +valor: SkillCoins
+    }
+    class "PrecioConPromocion" as PrecioConPromocion <<Decorator>> {
+      -envuelto: Precio
+      -promocion: Promocion
+      +valor(): SkillCoins
+    }
+    interface "Promocion" as Promocion <<Decorator>> {
+      +aplicar(precio: SkillCoins): SkillCoins
+    }
+  }
+  package "publicacion.exception" as pkg_Domain_publicacion_exception {
+    class "CupoAgotadoException" as CupoAgotadoException
+    class "FranjaInvalidaException" as FranjaInvalidaException
+    class "PublicacionIncompletaException" as PublicacionIncompletaException {
+      -faltantes: List<String>
+    }
+  }
+  package "publicacion.state" as pkg_Domain_publicacion_state {
+    class "Borrador" as Borrador <<record>> <<State>> {
+      +nombre(): String
+      +publicar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +editar(): void
+      +admitePromociones(): boolean
+      +esVisibleParaTodos(): boolean
+    }
+    class "Cancelada" as Cancelada_publicacion_state <<record>> <<State>> {
+      +nombre(): String
+    }
+    class "Cerrada" as Cerrada <<record>> <<State>> {
+      +nombre(): String
+    }
+    interface "EstadoPublicacion" as EstadoPublicacion <<State>> {
+      +nombre(): String
+      +publicar(): EstadoPublicacion
+      +pausar(): EstadoPublicacion
+      +reanudar(): EstadoPublicacion
+      +cerrar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +editar(): void
+      +admiteSolicitudes(): boolean
+      +esVisibleParaTodos(): boolean
+      +admiteReservas(): boolean
+      +admitePromociones(): boolean
+    }
+    class "Pausada" as Pausada <<record>> <<State>> {
+      +nombre(): String
+      +reanudar(): EstadoPublicacion
+      +cerrar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +admitePromociones(): boolean
+      +esVisibleParaTodos(): boolean
+      +admiteReservas(): boolean
+    }
+    class "Publicada" as Publicada <<record>> <<State>> {
+      +nombre(): String
+      +pausar(): EstadoPublicacion
+      +cerrar(): EstadoPublicacion
+      +cancelar(): EstadoPublicacion
+      +admiteSolicitudes(): boolean
+      +admitePromociones(): boolean
+      +admiteReservas(): boolean
+    }
+  }
+  package "shared" as pkg_Domain_shared {
+    abstract class "DomainException" as DomainException #EEEEEE
+    class "CambioEstado" as CambioEstado <<record>> #EEEEEE
+  }
+}
+
+CupoAgotadoException --|> DomainException
+FranjaInvalidaException --|> DomainException
+PublicacionIncompletaException --|> DomainException
+DescuentoFijo ..|> Promocion
+DescuentoPorcentual ..|> Promocion
+PrecioBase ..|> Precio
+PrecioConPromocion ..|> Precio
+Borrador ..|> EstadoPublicacion
+Cancelada_publicacion_state ..|> EstadoPublicacion
+Cerrada ..|> EstadoPublicacion
+Pausada ..|> EstadoPublicacion
+Publicada ..|> EstadoPublicacion
+Publicacion "1" *-- "*" FranjaDisponibilidad : franjas
+Publicacion "1" *-- "*" Promocion : promociones
+Publicacion "1" *-- "*" CambioEstado : historial
+BusquedaService --> "1" PublicacionRepository : publicacionRepository
+ContratacionService --> "1" PublicacionRepository : publicacionRepository
+PerfilService --> "1" PublicacionRepository : publicacionRepository
+PerfilDTO --> "*" PublicacionDTO : publicacionesActivas
+PublicacionService --> "1" PerfilRepository : perfilRepository
+PublicacionService --> "1" PublicacionRepository : publicacionRepository
+PublicacionDTO --> "*" FranjaDTO : franjas
+PublicacionDTO --> "*" PromocionDTO : promociones
+Publicacion --> "1" EstadoPublicacion : estado
+PrecioConPromocion --> "1" Promocion : promocion
+PublicacionMapper_publicacion ..> FranjaDTO
+PublicacionMapper_publicacion ..> PromocionDTO
+PublicacionMapper_publicacion ..> PublicacionDTO
+PublicacionMapper_publicacion ..> Publicacion
+PublicacionMapper_publicacion ..> DescuentoFijo
+PublicacionMapper_publicacion ..> DescuentoPorcentual
+PublicacionMapper_publicacion ..> Promocion
+PublicacionService ..> PublicacionMapper_publicacion
+PublicacionService ..> DatosPublicacionCommand
+PublicacionService ..> PromocionDTO
+PublicacionService ..> PublicacionDTO
+PublicacionService ..> Publicacion
+Publicacion ..> PrecioBase
+Publicacion ..> PrecioConPromocion
+Publicacion ..> Borrador
+PublicacionRepository ..> Publicacion
+Borrador ..> Cancelada_publicacion_state
+Borrador ..> Publicada
+Pausada ..> Cancelada_publicacion_state
+Pausada ..> Cerrada
+Pausada ..> Publicada
+Publicada ..> Cancelada_publicacion_state
+Publicada ..> Cerrada
+Publicada ..> Pausada
+
+legend right
+  ~-~-> asociación (campo) · *~-~- composición · o~-~- agregación
+  ..> dependencia (parámetro, retorno, new, throw, referencia por id)
+  ..|> realización · ~-~-|> generalización
+  Estereotipos: patrones de diseño aplicados
+endlegend
+@enduml

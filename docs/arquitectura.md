@@ -1,7 +1,8 @@
 # Arquitectura
 
-Este documento describe la base de código generada para continuar el TPI. La
-consigna PDF de la cátedra prevalece si difiere de esta interpretación.
+Este documento describe el backend de SkillSwap tal como se entrega. La
+consigna PDF de la cátedra prevalece si difiere de esta interpretación. Las
+decisiones están justificadas en [`informe-decisiones.md`](informe-decisiones.md).
 
 ## Estructura y regla de dependencias
 
@@ -34,11 +35,13 @@ ar.edu.uade.skillswap
 │   ├── memoria/             # Repositorios, buscador y unidad de trabajo en memoria (tests y demo sin MySQL)
 │   ├── notificacion/        # Patrón Adapter: EmailAdapter y PushAdapter sobre proveedores simulados
 │   ├── identidad/           # ServicioIdentidadSimulado
-│   └── configuracion/       # BackendEnMemoria: composition root sin Spring
-│                            # (pendiente: JPA y Flyway, del equipo de persistencia)
-├── controllers/             # Contrato actual de la UI Swing
-├── model/                   # Modelos de vista existentes
-├── mock/                    # Implementación de demostración existente
+│   ├── persistencia/        # JPA y MySQL: entidades, mappers, repositorios, buscador, UnidadDeTrabajoJpa, Flyway
+│   └── configuracion/       # BackendEnMemoria y BackendJpa (composition roots sin Spring) y DatosDemo
+├── controllers/             # UiControllers (contrato de la cátedra) e interfaces del equipo (*Operaciones,
+│   │                        # RecomendacionController, CalificacionController)
+│   └── impl/                # Un *ControllerImpl por interfaz, SkillSwapControllers, ManejoDeErrores, ModelosMapper
+├── model/                   # Modelos de vista de la cátedra
+├── mock/                    # Mock original de la cátedra (ya no lo usa main)
 └── ui/                      # Interfaz provista; no contiene reglas de negocio
 ```
 
@@ -59,8 +62,11 @@ por id (`PublicacionId`, `FranjaId` o el `userId` de las personas); la coordinac
 la capa de aplicación. `ArquitecturaTest` también verifica que `application`
 dependa solo del dominio y que no use `reconstruir(...)` (eso es solo para los
 repositorios). La configuración de objetos es manual, por constructor:
-`BackendEnMemoria` arma todo con la implementación en memoria, y la versión con
-base de datos será otro composition root igual que cambie los repositorios.
+`BackendEnMemoria` arma todo con la implementación en memoria y `BackendJpa`, los
+mismos Services con los repositorios JPA. `SkillSwapApplication` usa `BackendJpa`
+por defecto y `BackendEnMemoria` con `--memoria`. `ArquitecturaTest` verifica
+además que los controllers no usen repositorios, infraestructura, JPA ni Swing, y
+que la infraestructura no lance excepciones de negocio.
 
 ## Dominio implementado
 
@@ -241,6 +247,49 @@ perfil. Un suscriptor que falla no deshace la operación ni corta a los demás.
 - Limitación conocida: `findPublicadas()` no tiene límite (las recomendaciones
   cargan todas las publicadas).
 
+## Persistencia (JPA y MySQL)
+
+- **Esquema:** lo define solo Flyway (`V1__esquema_inicial.sql`); Hibernate corre con
+  `hbm2ddl.auto=validate`, así que si una entidad no coincide con la tabla la app no arranca.
+  `Migraciones` corre Flyway al construir `BackendJpa`. La Wallet de garantía la inserta la migración.
+- **Entidades** solo en `infrastructure/persistencia/<módulo>`, una por tabla (las colecciones de textos,
+  como etiquetas y habilidades, son `@ElementCollection`). Un mapper por agregado arma el dominio con
+  `reconstruir(...)` y los estados se guardan por nombre (`"PUBLICADA"`).
+- **Transacciones:** `UnidadDeTrabajoJpa` abre un `EntityManager` por transacción (en un `ThreadLocal`),
+  hace `begin`/`commit` y `rollback` si algo falla. Los repositorios usan ese `EntityManager`; fuera de
+  una transacción, cada llamada abre una transacción corta propia.
+- **Concurrencia (caso 4):** `@Version` en publicación, wallet, contratación y perfil. Guardar una
+  publicación siempre sube su versión (`OPTIMISTIC_FORCE_INCREMENT`), aunque solo cambie el cupo de una
+  franja: de dos aceptaciones simultáneas sobre el último lugar, la segunda falla al confirmar y se
+  traduce a `ConflictoDeConcurrenciaException`.
+- **Unicidad:** `UNIQUE(contratacion_id, titular_id, tipo)` en movimientos impide el doble cobro, y
+  `UNIQUE(contratacion_id, autor_id)` en calificaciones, la calificación duplicada.
+- **Denormalizaciones:** `publicaciones.precio_final` (con promociones) y `publicada_en` se calculan con
+  el dominio al guardar, para filtrar y ordenar la búsqueda en SQL.
+- **Sin N+1:** los listados buscan primero los ids de la página (con una consulta de `count` para el
+  total) y después cargan ese lote con una consulta `join fetch` por colección.
+- **MySQL local:** `docker compose up -d` levanta MySQL 8 en el puerto 3307 (usuario y contraseña de
+  desarrollo `skillswap`). `DB_URL`, `DB_USER` y `DB_PASSWORD` cambian la conexión.
+
+## Controllers e integración con la UI
+
+- `SkillSwapControllers` implementa `UiControllers` (sin modificarlo) y se construye con los seis
+  Services. Hay un `*ControllerImpl` por sub-interfaz; cada uno valida el `userId`, delega en un
+  Service y mapea el DTO a `Models` con `ModelosMapper`.
+- Lo que la consigna pide y la UI no expone está en interfaces del equipo: `ContratacionOperaciones`
+  (aceptar, rechazar, pagar, iniciar, completar, cancelar con motivo, reprogramar), `PublicacionOperaciones`
+  (franjas y descuentos), `PerfilOperaciones`, `BusquedaOperaciones` (todos los filtros, cuatro órdenes,
+  paginación), `WalletOperaciones`, `NotificacionOperaciones`, `RecomendacionController` y
+  `CalificacionController`. Los listados paginados devuelven `PaginaVista<T>`.
+- **Errores:** `ManejoDeErrores` traduce `DomainException`, `ApplicationException` e
+  `IllegalArgumentException` a `OperacionRechazadaException`; `SkillSwapApplication` muestra el mensaje
+  en un `JOptionPane`, porque la vista no atrapa excepciones.
+- **Adaptaciones a la UI:** `avanzar` decide según estado y rol (aceptar, pagar, iniciar o completar);
+  `solicitar` usa la primera franja futura con lugar; `crearBorrador` crea con cupo 1 y una franja a
+  7 días; los listados de la UI piden la primera página de 50.
+- **Datos de demo:** `DatosDemo` los carga con los Services (sirve igual con MySQL y en memoria) y es
+  idempotente: si Mateo ya tiene perfil, no hace nada.
+
 ## Patrones
 
 | Patrón | Variación que resuelve | Dónde | Evidencia |
@@ -250,19 +299,23 @@ perfil. Un suscriptor que falla no deshace la operación ni corta a los demás.
 | Simple Factory | Elegir la política de reintegro; elegir el canal de envío según el perfil | `PoliticaReintegroFactory`, `CanalEnvioFactory` | `PoliticaReintegroFactoryTest`, `CanalEnvioFactoryTest` |
 | Decorator | Promociones acumulables sobre el precio | `domain/publicacion/decorator` | `PromocionTest`, `PrecioTest`, `PublicacionServiceTest` (caso 9) |
 | Observer | Un evento interesa a varias personas y puede tener varias reacciones | `PublicadorEventos`, `NotificadorDeInteresados` | `PublicadorEventosTest`, `NotificadorDeInteresadosTest` (caso 8) |
-| Adapter | Proveedores externos de email, push e identidad, reemplazables | `infrastructure/notificacion`, `infrastructure/identidad` | `AdaptersDeNotificacionTest`, caso 8 |
+| Adapter | Proveedores externos de email, push e identidad, y la persistencia JPA, reemplazables | `infrastructure/notificacion`, `infrastructure/identidad`, `infrastructure/persistencia` | `AdaptersDeNotificacionTest`, caso 8, tests de persistencia |
 
 No se introducen patrones sin una variación concreta.
 
 ## Migraciones
 
-`src/main/resources/db/migration/V1__esquema_inicial.sql` define el esquema
-relacional previsto, claves foráneas, restricciones, índices y control de
-versiones para publicaciones, contrataciones y wallets. Los datos se mantienen
-en tablas relacionales normalizadas; las migraciones, no Hibernate, serán la
-fuente de verdad del esquema. Las entidades/adaptadores JPA deben mapear estas
-tablas y validar el esquema en vez de crearlo.
+`src/main/resources/db/migration/V1__esquema_inicial.sql` define el esquema:
+claves foráneas, restricciones de unicidad, índices y columnas de versión para
+publicaciones, contrataciones, wallets y perfiles. Flyway es la única fuente de
+verdad del esquema: `Migraciones.aplicar` corre al construir `BackendJpa` (o sea,
+al arrancar la app) y Hibernate solo valida. Un cambio futuro va en una `V2`.
 
-La migración todavía no se ejecuta automáticamente desde la UI: falta definir la
-configuración de conexión local y el adaptador de arranque una vez que el equipo
-prepare MySQL.
+## Pruebas
+
+- `mvn test`: 564 tests. Los 24 de `infrastructure/persistencia` usan Testcontainers
+  y se omiten sin Docker.
+- JaCoCo: reporte en `target/site/jacoco/index.html`. Dominio + aplicación: 99,4 % de
+  líneas y 95,3 % de ramas; `mvn verify` exige al menos 80 % de líneas.
+- `CasosDeAceptacionTest` recorre los 10 casos de aceptación a través de los controllers;
+  `CasosNegativosTest`, los rechazos y sus mensajes.
