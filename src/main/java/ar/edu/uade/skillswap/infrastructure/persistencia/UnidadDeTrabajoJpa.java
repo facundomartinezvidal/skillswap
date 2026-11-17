@@ -8,6 +8,8 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PessimisticLockException;
 import org.hibernate.StaleStateException;
+import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.exception.DataException;
 import org.hibernate.exception.LockAcquisitionException;
 
 import java.util.Objects;
@@ -71,17 +73,30 @@ public class UnidadDeTrabajoJpa implements UnidadDeTrabajo {
     }
 
     /**
-     * Hibernate avisa el conflicto con distintas excepciones según dónde lo detecta (en el flush, o en el
-     * commit, que además la envuelve). Un deadlock de MySQL entre las dos transacciones también es un
-     * conflicto de concurrencia. Las demás excepciones (reglas del dominio, restricciones) pasan tal cual.
+     * Traduce los errores de la base a errores que la UI sabe mostrar:
+     * <ul>
+     *   <li>El bloqueo optimista o un deadlock de MySQL entre dos transacciones: Hibernate lo avisa con
+     *   distintas excepciones según dónde lo detecta (en el flush, o en el commit, que además la envuelve).</li>
+     *   <li>Una restricción de la base (por ejemplo, un único que impide el doble cobro o la doble
+     *   calificación): el dominio ya valida esas reglas, así que si salta la restricción es porque otra
+     *   operación hizo lo mismo al mismo tiempo. También es un conflicto de concurrencia.</li>
+     *   <li>Un dato que la columna no admite (por ejemplo, un texto más largo que la columna):
+     *   {@link IllegalArgumentException} con un mensaje para el usuario.</li>
+     * </ul>
+     * Las demás excepciones (reglas del dominio, errores de la aplicación) pasan tal cual.
      */
     private static RuntimeException traducir(RuntimeException e) {
         for (Throwable causa = e; causa != null; causa = causa.getCause()) {
             if (causa instanceof OptimisticLockException || causa instanceof StaleStateException
-                    || causa instanceof PessimisticLockException || causa instanceof LockAcquisitionException) {
+                    || causa instanceof PessimisticLockException || causa instanceof LockAcquisitionException
+                    || causa instanceof ConstraintViolationException) {
                 var conflicto = new ConflictoDeConcurrenciaException();
                 conflicto.initCause(e);
                 return conflicto;
+            }
+            if (causa instanceof DataException) {
+                return new IllegalArgumentException(
+                        "Algún dato no es válido para guardarse (por ejemplo, un texto demasiado largo)", e);
             }
         }
         return e;

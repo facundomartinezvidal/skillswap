@@ -30,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -37,8 +38,10 @@ import java.util.stream.Collectors;
  * calificar, más rechazar, cancelar con reintegro y reprogramar. Lo usan el {@code ContratacionController}
  * y el {@code CalificacionController}.
  * <p>
- * Coordina agregados que se conocen solo por id; las reglas viven en ellos. Las operaciones que tocan
- * más de un agregado corren en una {@link UnidadDeTrabajo}: o se guarda todo o nada. Igual, por
+ * Coordina agregados que se conocen solo por id; las reglas viven en ellos. Toda operación que modifica
+ * corre en una {@link UnidadDeTrabajo}: si toca varios agregados, se guarda todo o nada, y aunque toque
+ * uno solo, la lectura y el guardado quedan en la misma transacción para que el bloqueo optimista
+ * detecte los cambios concurrentes. Igual, por
  * claridad, primero se modifican todos los agregados (cualquiera puede rechazar la operación) y los
  * {@code save} van juntos al final. Los eventos se publican después de confirmar, así una operación
  * rechazada no notifica a nadie.
@@ -77,16 +80,19 @@ public class ContratacionService {
      * que la franja no haya empezado y tenga lugar; el cupo se reserva recién al aceptar.
      */
     public ContratacionDTO solicitar(SolicitarContratacionCommand command) {
-        validarCliente(command.clienteId());
-        var publicacion = buscarPublicacion(new PublicacionId(Ids.uuid("publicación", command.publicacionId())));
-        validarProveedor(publicacion.autorId());
-        var franja = publicacion.franjaParaSolicitar(new FranjaId(Ids.uuid("franja", command.franjaId())), ahora());
-        var solicitud = new Solicitud(command.mensaje(), command.objetivo(), franja.id());
-        var contratacion = Contratacion.solicitar(command.clienteId(), publicacion.autorId(), publicacion.id(),
-                solicitud, franja.inicio(), publicacion.precioFinal(), ahora());
-        contratacionRepository.save(contratacion);
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            validarCliente(command.clienteId());
+            var publicacion = buscarPublicacion(new PublicacionId(Ids.uuid("publicación", command.publicacionId())));
+            validarProveedor(publicacion.autorId());
+            var franja = publicacion.franjaParaSolicitar(new FranjaId(Ids.uuid("franja", command.franjaId())), ahora());
+            var solicitud = new Solicitud(command.mensaje(), command.objetivo(), franja.id());
+            var nueva = Contratacion.solicitar(command.clienteId(), publicacion.autorId(), publicacion.id(),
+                    solicitud, franja.inicio(), publicacion.precioFinal(), ahora());
+            contratacionRepository.save(nueva);
+            return nueva;
+        });
         publicarEventos(contratacion);
-        return ContratacionMapper.aDTO(contratacion, publicacion.titulo());
+        return aDTO(contratacion);
     }
 
     /**
@@ -109,11 +115,7 @@ public class ContratacionService {
     }
 
     public ContratacionDTO rechazar(String userId, String contratacionId, String motivo) {
-        var contratacion = buscar(contratacionId);
-        contratacion.rechazar(userId, motivo, ahora());
-        contratacionRepository.save(contratacion);
-        publicarEventos(contratacion);
-        return aDTO(contratacion);
+        return modificar(contratacionId, contratacion -> contratacion.rechazar(userId, motivo, ahora()));
     }
 
     /**
@@ -139,11 +141,7 @@ public class ContratacionService {
     }
 
     public ContratacionDTO iniciar(String userId, String contratacionId) {
-        var contratacion = buscar(contratacionId);
-        contratacion.iniciar(userId, ahora());
-        contratacionRepository.save(contratacion);
-        publicarEventos(contratacion);
-        return aDTO(contratacion);
+        return modificar(contratacionId, contratacion -> contratacion.iniciar(userId, ahora()));
     }
 
     /** El proveedor completa y cobra lo que estaba retenido en la garantía, en una transacción. */
@@ -211,13 +209,11 @@ public class ContratacionService {
      * la publicación esté pausada, porque la contratación ya existe. Responde la otra parte.
      */
     public ContratacionDTO proponerReprogramacion(String userId, String contratacionId, String nuevaFranjaId) {
-        var contratacion = buscar(contratacionId);
-        var publicacion = buscarPublicacion(contratacion.publicacionId());
-        var franja = publicacion.franjaDisponible(new FranjaId(Ids.uuid("franja", nuevaFranjaId)), ahora());
-        contratacion.proponerReprogramacion(userId, franja.id(), franja.inicio(), ahora());
-        contratacionRepository.save(contratacion);
-        publicarEventos(contratacion);
-        return ContratacionMapper.aDTO(contratacion, publicacion.titulo());
+        return modificar(contratacionId, contratacion -> {
+            var publicacion = buscarPublicacion(contratacion.publicacionId());
+            var franja = publicacion.franjaDisponible(new FranjaId(Ids.uuid("franja", nuevaFranjaId)), ahora());
+            contratacion.proponerReprogramacion(userId, franja.id(), franja.inicio(), ahora());
+        });
     }
 
     /** Aplica la propuesta: reserva la franja nueva y libera la anterior, en una transacción. */
@@ -238,11 +234,7 @@ public class ContratacionService {
     }
 
     public ContratacionDTO rechazarReprogramacion(String userId, String contratacionId) {
-        var contratacion = buscar(contratacionId);
-        contratacion.rechazarReprogramacion(userId, ahora());
-        contratacionRepository.save(contratacion);
-        publicarEventos(contratacion);
-        return aDTO(contratacion);
+        return modificar(contratacionId, contratacion -> contratacion.rechazarReprogramacion(userId, ahora()));
     }
 
     /** Califica a la otra parte y suma el puntaje a su reputación, en una transacción. */
@@ -315,6 +307,22 @@ public class ContratacionService {
     private Wallet buscarWallet(String titularId) {
         return walletRepository.findByTitular(titularId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("wallet", titularId));
+    }
+
+    /**
+     * Para las operaciones que solo cambian la contratación: la lee, le aplica el cambio y la guarda en
+     * una transacción, así el bloqueo optimista detecta un cambio concurrente (por ejemplo, un rechazo que
+     * se cruza con una aceptación). Los eventos se publican después de confirmar.
+     */
+    private ContratacionDTO modificar(String contratacionId, Consumer<Contratacion> cambio) {
+        var contratacion = unidadDeTrabajo.ejecutar(() -> {
+            var c = buscar(contratacionId);
+            cambio.accept(c);
+            contratacionRepository.save(c);
+            return c;
+        });
+        publicarEventos(contratacion);
+        return aDTO(contratacion);
     }
 
     /** Se llama en todas las operaciones, aunque hoy algunas no emitan eventos, para no perder uno nuevo. */
