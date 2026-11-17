@@ -1,5 +1,6 @@
 package ar.edu.uade.skillswap.infrastructure.persistencia;
 
+import ar.edu.uade.skillswap.application.shared.exception.ConflictoDeConcurrenciaException;
 import ar.edu.uade.skillswap.domain.contratacion.Contratacion;
 import ar.edu.uade.skillswap.domain.contratacion.Solicitud;
 import ar.edu.uade.skillswap.domain.publicacion.Modalidad;
@@ -7,7 +8,6 @@ import ar.edu.uade.skillswap.domain.shared.Puntaje;
 import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import ar.edu.uade.skillswap.domain.wallet.Wallet;
 
-import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -48,7 +48,7 @@ class RestriccionesJpaTest extends BaseDeDatosDePrueba {
         segundoPago.debitar(new SkillCoins(100), "Pago", contratacion.id(), AHORA);
         wallets.save(primerPago);
 
-        assertThrows(PersistenceException.class, () -> unidadDeTrabajo.ejecutar(() -> {
+        assertThrows(ConflictoDeConcurrenciaException.class, () -> unidadDeTrabajo.ejecutar(() -> {
             wallets.save(segundoPago);
             return null;
         }));
@@ -70,7 +70,7 @@ class RestriccionesJpaTest extends BaseDeDatosDePrueba {
         otraCopia.calificar(MATEO, new Puntaje(1), "Malísima", AHORA);
         contrataciones.save(unaCopia);
 
-        assertThrows(PersistenceException.class, () -> contrataciones.save(otraCopia));
+        assertThrows(ConflictoDeConcurrenciaException.class, () -> contrataciones.save(otraCopia));
 
         assertEquals(1, contarFilas("select count(*) from calificaciones"));
         assertEquals(5, contrataciones.findById(contratacion.id()).orElseThrow().calificaciones().get(0).puntaje().valor());

@@ -24,7 +24,7 @@ class WalletServiceTest {
 
     private final UnidadDeTrabajoEnMemoria unidadDeTrabajo = new UnidadDeTrabajoEnMemoria();
     private final WalletRepositoryEnMemoria wallets = new WalletRepositoryEnMemoria(unidadDeTrabajo);
-    private final WalletService service = new WalletService(wallets, Clock.fixed(AHORA, ZoneOffset.UTC));
+    private final WalletService service = new WalletService(wallets, unidadDeTrabajo, Clock.fixed(AHORA, ZoneOffset.UTC));
 
     @BeforeEach
     void abrirWallet() {
