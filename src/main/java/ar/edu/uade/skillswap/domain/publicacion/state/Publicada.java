@@ -31,4 +31,9 @@ public record Publicada() implements EstadoPublicacion {
     public boolean admitePromociones() {
         return true;
     }
+
+    @Override
+    public boolean admiteReservas() {
+        return true;
+    }
 }

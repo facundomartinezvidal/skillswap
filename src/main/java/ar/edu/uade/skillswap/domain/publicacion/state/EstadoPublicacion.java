@@ -46,6 +46,14 @@ public sealed interface EstadoPublicacion
         return true;
     }
 
+    /**
+     * Si se puede tomar o mover un lugar para una contratación que ya existe (aceptar o reprogramar).
+     * PUBLICADA y PAUSADA sí; una publicación CERRADA o CANCELADA ya terminó y no admite reservas.
+     */
+    default boolean admiteReservas() {
+        return false;
+    }
+
     /** Si el autor puede agregar o quitar promociones en este estado. */
     default boolean admitePromociones() {
         return false;

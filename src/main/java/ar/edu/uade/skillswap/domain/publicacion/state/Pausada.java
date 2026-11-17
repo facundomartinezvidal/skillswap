@@ -32,4 +32,9 @@ public record Pausada() implements EstadoPublicacion {
     public boolean esVisibleParaTodos() {
         return false;
     }
+
+    @Override
+    public boolean admiteReservas() {
+        return true;
+    }
 }

@@ -166,12 +166,13 @@ public final class Publicacion {
     }
 
     /**
-     * La franja elegida, si es de esta publicación, todavía no empezó y tiene lugar (regla 3).
-     * No mira el estado de la publicación: también la usa la reprogramación de una contratación que ya
-     * existe, que sigue valiendo aunque la publicación esté pausada.
+     * La franja elegida, si la publicación admite reservas (PUBLICADA o PAUSADA), si la franja es de
+     * esta publicación, todavía no empezó y tiene lugar (regla 3). La usa también la reprogramación de
+     * una contratación que ya existe, que sigue valiendo aunque la publicación esté pausada.
      */
     public FranjaDisponibilidad franjaDisponible(FranjaId franjaId, Instant ahora) {
         Objects.requireNonNull(ahora, "El momento de la consulta es obligatorio");
+        validarQueAdmiteReservas();
         var franja = findFranja(franjaId);
         if (!franja.inicio().isAfter(ahora)) {
             throw new FranjaInvalidaException("La franja ya empezó: no se puede elegir");
@@ -183,11 +184,19 @@ public final class Publicacion {
     }
 
     /**
-     * Toma un lugar de la franja (el cupo es por franja). No depende de que la publicación admita
-     * solicitudes nuevas: el proveedor puede aceptar una solicitud que recibió antes de pausar.
+     * Toma un lugar de la franja (el cupo es por franja). Con la publicación PAUSADA se puede, porque el
+     * proveedor tiene que poder aceptar una solicitud que recibió antes de pausar; con la publicación
+     * CERRADA o CANCELADA, no.
      */
     public void reservarCupo(FranjaId franjaId) {
+        validarQueAdmiteReservas();
         findFranja(franjaId).reservar(cupo);
+    }
+
+    private void validarQueAdmiteReservas() {
+        if (!estado.admiteReservas()) {
+            throw new TransicionInvalidaException(estado.nombre(), "reservar cupo");
+        }
     }
 
     /** Un BORRADOR o una PAUSADA solo la ve su autor; los demás estados los ve cualquiera. */

@@ -270,6 +270,21 @@ class ContratacionServiceTest {
         }
 
         @Test
+        void conLaPublicacionCerradaNoSeAceptaNiSeReprograma() {
+            var pendiente = solicitar(CLIENTE, en72Horas);
+            var aceptada = solicitar(OTRO_CLIENTE, en72Horas);
+            service.aceptar(PROVEEDOR, aceptada.id());
+            publicacion = publicaciones.findById(publicacion.id()).orElseThrow();
+            publicacion.cerrar(PROVEEDOR, "terminó el ciclo", AHORA);
+            publicaciones.save(publicacion);
+
+            assertThrows(TransicionInvalidaException.class, () -> service.aceptar(PROVEEDOR, pendiente.id()));
+            assertEquals("PENDIENTE", estadoGuardado(pendiente.id()));
+            assertThrows(TransicionInvalidaException.class,
+                    () -> service.proponerReprogramacion(OTRO_CLIENTE, aceptada.id(), en30Horas.valor().toString()));
+        }
+
+        @Test
         void soloElProveedorAcepta() {
             var contratacion = solicitar(CLIENTE, en72Horas);
 

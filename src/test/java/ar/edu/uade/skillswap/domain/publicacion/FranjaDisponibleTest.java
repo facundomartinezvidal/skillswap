@@ -69,6 +69,20 @@ class FranjaDisponibleTest {
     }
 
     @Test
+    void conLaPublicacionCerradaOCanceladaLaFranjaNoEstaDisponible() {
+        crearBorrador(2);
+        publicacion.publicar(AUTOR, AHORA);
+        publicacion.cerrar(AUTOR, null, AHORA);
+
+        assertThrows(TransicionInvalidaException.class, () -> publicacion.franjaDisponible(franja, AHORA));
+
+        crearBorrador(2);
+        publicacion.publicar(AUTOR, AHORA);
+        publicacion.cancelar(AUTOR, "ya no la dicto", AHORA);
+        assertThrows(TransicionInvalidaException.class, () -> publicacion.franjaDisponible(franja, AHORA));
+    }
+
+    @Test
     void unaFranjaQueYaEmpezoSeRechaza() {
         crearBorrador(2);
         publicacion.publicar(AUTOR, AHORA);
