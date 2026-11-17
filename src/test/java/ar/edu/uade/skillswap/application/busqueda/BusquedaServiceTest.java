@@ -85,7 +85,7 @@ class BusquedaServiceTest {
 
     @Test
     void caso1_publicarUnaMentoriaValidaYEncontrarlaConFiltros() {
-        var publicacionService = new PublicacionService(publicaciones, perfiles, Clock.fixed(AHORA, ZoneOffset.UTC));
+        var publicacionService = new PublicacionService(publicaciones, perfiles, unidadDeTrabajo, Clock.fixed(AHORA, ZoneOffset.UTC));
         var borrador = publicacionService.crearBorrador(ANA, new DatosPublicacionCommand("Mentoría de testing",
                 "TDD desde cero", "Programación", Modalidad.REMOTA, Duration.ofHours(1), 1, 80L, Set.of("junit")));
         publicacionService.agregarFranja(ANA, borrador.id(), AHORA.plus(Duration.ofDays(2)),

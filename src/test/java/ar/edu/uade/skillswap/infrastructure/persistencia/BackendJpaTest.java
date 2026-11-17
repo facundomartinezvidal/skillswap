@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -158,6 +160,52 @@ class BackendJpaTest extends BaseDeDatosDePrueba {
             errores.add(e);
         }
         return null;
+    }
+
+    /**
+     * Revisión de #20: una operación sobre la publicación que se cruza con una aceptación no puede pisar la
+     * reserva del cupo. La pausa lee la publicación y queda retenida (por el reloj) antes de guardar; en
+     * ese momento la aceptación termina entera y reserva el lugar. Como la pausa lee y guarda en la misma
+     * transacción, el bloqueo optimista la hace fallar en lugar de dejar la contratación ACEPTADA sin su
+     * lugar reservado (lo que después permitiría vender ese lugar otra vez).
+     */
+    @Test
+    void unaPausaQueSeCruzaConUnaAceptacionNoPisaLaReserva() throws Exception {
+        crearPerfiles(ANA, MATEO);
+        var mentoria = publicarMentoria(1, 100);
+        var deMateo = solicitar(MATEO, mentoria);
+        var llego = new CountDownLatch(1);
+        var soltar = new CountDownLatch(1);
+        reloj.retenerAlProximoHilo(llego, soltar);
+
+        var hilo = Executors.newSingleThreadExecutor();
+        var pausa = hilo.submit(() -> backend.publicacionService.pausar(ANA, mentoria.id(), "Vacaciones"));
+        assertTrue(llego.await(10, TimeUnit.SECONDS), "la pausa leyó la publicación y quedó retenida");
+        backend.contratacionService.aceptar(ANA, deMateo);
+        soltar.countDown();
+        var error = assertThrows(ExecutionException.class, () -> pausa.get(30, TimeUnit.SECONDS));
+        hilo.shutdown();
+
+        assertInstanceOf(ConflictoDeConcurrenciaException.class, error.getCause());
+        assertEquals("ACEPTADA", estado(deMateo));
+        var publicacion = backend.publicaciones.findById(new PublicacionId(UUID.fromString(mentoria.id())))
+                .orElseThrow();
+        assertEquals(1, publicacion.franjas().get(0).reservados(), "la reserva de la aceptación sigue en pie");
+        assertEquals("PUBLICADA", publicacion.estado().nombre(), "la pausa no se guardó");
+    }
+
+    /** Revisión de #20: un dato que la columna no admite llega como un error que la UI sabe mostrar. */
+    @Test
+    void unTituloMasLargoQueLaColumnaSeRechazaSinGuardarNada() throws SQLException {
+        crearPerfiles(ANA);
+        var publicacionesAntes = contarFilas("select count(*) from publicaciones");
+        var titulo = "x".repeat(181);
+
+        assertThrows(IllegalArgumentException.class, () -> backend.publicacionService.crearBorrador(ANA,
+                new DatosPublicacionCommand(titulo, "Descripción", "Programación", Modalidad.REMOTA,
+                        Duration.ofHours(1), 1, 100L, Set.of("java"))));
+
+        assertEquals(publicacionesAntes, contarFilas("select count(*) from publicaciones"));
     }
 
     /** Caso de aceptación 5: el pago sin saldo suficiente no cambia saldos, estado ni movimientos. */
