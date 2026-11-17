@@ -326,6 +326,20 @@ class ContratacionServiceTest {
         }
 
         @Test
+        void unaContratacionGratuitaSePagaYCompletaSinMoverSaldos() {
+            publicacion.agregarPromocion(new DescuentoPorcentual(100));
+            publicaciones.save(publicacion);
+
+            var contratacion = completada();
+
+            assertEquals(0, contratacion.precioAcordado());
+            assertEquals("COMPLETADA", contratacion.estado());
+            assertEquals(SALDO_INICIAL, saldo(CLIENTE));
+            assertEquals(0, saldo(PROVEEDOR));
+            assertEquals(0, garantia());
+        }
+
+        @Test
         void rechazarNoReservaCupoNiMueveFondos() {
             var contratacion = solicitar(CLIENTE, en72Horas);
 
