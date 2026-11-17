@@ -119,6 +119,7 @@ Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y
 - Las firmas de los Services y los puertos (PR #12) son el contrato para persistencia y controllers. Todos los Services están implementados (PRs #14 a #17); un controller se conecta a un Service recién cuando su PR está mergeado.
 - Checklist que pidió la revisión, para código nuevo:
   - Las reglas que dependen del estado las responde el dominio, no una lista de nombres en el Service.
+  - Toda operación que modifica un agregado corre en una `UnidadDeTrabajo`, aunque toque uno solo: la lectura y el `save` tienen que estar en la misma transacción para que el `@Version` detecte los cambios concurrentes.
   - Adentro de una `UnidadDeTrabajo`, primero se modifican todos los agregados y los `save` van al final.
   - Los DTOs copian sus colecciones.
   - Los listados no hacen N+1 (`findByIds`, `findByUserIds`).

@@ -21,6 +21,7 @@ import ar.edu.uade.skillswap.domain.wallet.WalletRepository;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Casos de uso del perfil. Lo usa el {@code PerfilController}.
@@ -76,37 +77,30 @@ public class PerfilService {
 
     /** Reemplaza nombre, biografía, zona horaria, habilidades e intereses. Un conjunto nulo queda vacío. */
     public PerfilDTO editarPerfil(String userId, EditarPerfilCommand command) {
-        var perfil = buscar(userId);
-        perfil.editarDatos(command.nombreVisible(), command.biografia(), command.zonaHoraria());
-        perfil.definirHabilidades(vacioSiEsNulo(command.habilidades()));
-        perfil.definirIntereses(vacioSiEsNulo(command.intereses()));
-        return guardar(perfil);
+        return modificar(userId, perfil -> {
+            perfil.editarDatos(command.nombreVisible(), command.biografia(), command.zonaHoraria());
+            perfil.definirHabilidades(vacioSiEsNulo(command.habilidades()));
+            perfil.definirIntereses(vacioSiEsNulo(command.intereses()));
+        });
     }
 
     public PerfilDTO agregarDisponibilidad(String userId, DisponibilidadDTO disponibilidad) {
-        var perfil = buscar(userId);
-        perfil.agregarDisponibilidad(disponibilidad.dia(), disponibilidad.inicio(), disponibilidad.fin());
-        return guardar(perfil);
+        return modificar(userId, perfil ->
+                perfil.agregarDisponibilidad(disponibilidad.dia(), disponibilidad.inicio(), disponibilidad.fin()));
     }
 
     public PerfilDTO quitarDisponibilidad(String userId, DisponibilidadDTO disponibilidad) {
-        var perfil = buscar(userId);
-        perfil.quitarDisponibilidad(
-                new DisponibilidadSemanal(disponibilidad.dia(), disponibilidad.inicio(), disponibilidad.fin()));
-        return guardar(perfil);
+        return modificar(userId, perfil -> perfil.quitarDisponibilidad(
+                new DisponibilidadSemanal(disponibilidad.dia(), disponibilidad.inicio(), disponibilidad.fin())));
     }
 
     public PerfilDTO elegirCanal(String userId, CanalNotificacion canal) {
-        var perfil = buscar(userId);
-        perfil.elegirCanal(canal);
-        return guardar(perfil);
+        return modificar(userId, perfil -> perfil.elegirCanal(canal));
     }
 
     /** Baja lógica (regla 9): el perfil y sus operaciones quedan, pero ya no se puede editar. */
     public void darDeBaja(String userId, String motivo) {
-        var perfil = buscar(userId);
-        perfil.darDeBaja(userId, motivo, clock.instant());
-        perfilRepository.save(perfil);
+        modificar(userId, perfil -> perfil.darDeBaja(userId, motivo, clock.instant()));
     }
 
     /** Perfil público de cualquier usuario: reputación, publicaciones activas e historial resumido. */
@@ -119,9 +113,18 @@ public class PerfilService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("perfil", userId));
     }
 
-    private PerfilDTO guardar(Perfil perfil) {
-        perfilRepository.save(perfil);
-        return aDTO(perfil);
+    /**
+     * Lee el perfil, le aplica el cambio y lo guarda en una transacción, para que el bloqueo optimista
+     * detecte un cambio concurrente (por ejemplo, una calificación que sumó a la reputación) en lugar de
+     * pisarlo.
+     */
+    private PerfilDTO modificar(String userId, Consumer<Perfil> cambio) {
+        return unidadDeTrabajo.ejecutar(() -> {
+            var perfil = buscar(userId);
+            cambio.accept(perfil);
+            perfilRepository.save(perfil);
+            return aDTO(perfil);
+        });
     }
 
     private PerfilDTO aDTO(Perfil perfil) {

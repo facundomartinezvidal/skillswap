@@ -4,6 +4,7 @@ import ar.edu.uade.skillswap.application.publicacion.dto.DatosPublicacionCommand
 import ar.edu.uade.skillswap.application.publicacion.dto.PromocionDTO;
 import ar.edu.uade.skillswap.application.publicacion.dto.PublicacionDTO;
 import ar.edu.uade.skillswap.application.shared.Ids;
+import ar.edu.uade.skillswap.application.shared.UnidadDeTrabajo;
 import ar.edu.uade.skillswap.application.shared.exception.PermisoDenegadoException;
 import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
 import ar.edu.uade.skillswap.domain.perfil.Perfil;
@@ -21,23 +22,28 @@ import ar.edu.uade.skillswap.domain.shared.SkillCoins;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Casos de uso de las publicaciones. Lo usa el {@code PublicacionController}.
  * Todas las operaciones que modifican validan que quien actúa sea el autor (regla 10); los estados,
  * los requisitos para publicar y las promociones los valida la {@link Publicacion}.
- * Cada operación toca un solo agregado, así que no necesita una unidad de trabajo.
+ * Toda operación que modifica corre en una {@link UnidadDeTrabajo}, aunque toque un solo agregado: la
+ * lectura y el guardado tienen que estar en la misma transacción para que el bloqueo optimista detecte
+ * los cambios concurrentes (por ejemplo, una edición que se cruza con una aceptación que reservó cupo).
  */
 public class PublicacionService {
 
     private final PublicacionRepository publicacionRepository;
     private final PerfilRepository perfilRepository;
+    private final UnidadDeTrabajo unidadDeTrabajo;
     private final Clock clock;
 
     public PublicacionService(PublicacionRepository publicacionRepository, PerfilRepository perfilRepository,
-                              Clock clock) {
+                              UnidadDeTrabajo unidadDeTrabajo, Clock clock) {
         this.publicacionRepository = Objects.requireNonNull(publicacionRepository);
         this.perfilRepository = Objects.requireNonNull(perfilRepository);
+        this.unidadDeTrabajo = Objects.requireNonNull(unidadDeTrabajo);
         this.clock = Objects.requireNonNull(clock);
     }
 
@@ -47,70 +53,61 @@ public class PublicacionService {
      * autor y {@link #publicar} no necesita volver a validarlo.
      */
     public PublicacionDTO crearBorrador(String userId, DatosPublicacionCommand datos) {
-        var autor = perfilActivo(userId, "crear una publicación");
-        var tipo = autor.tipo() == TipoPerfil.PROFESIONAL ? TipoPublicacion.OFERTA : TipoPublicacion.DESAFIO;
-        var publicacion = Publicacion.crearBorrador(userId, tipo);
-        editarCon(publicacion, datos);
-        publicacionRepository.save(publicacion);
-        return PublicacionMapper.aDTO(publicacion, autor);
+        return unidadDeTrabajo.ejecutar(() -> {
+            var autor = perfilActivo(userId, "crear una publicación");
+            var tipo = autor.tipo() == TipoPerfil.PROFESIONAL ? TipoPublicacion.OFERTA : TipoPublicacion.DESAFIO;
+            var publicacion = Publicacion.crearBorrador(userId, tipo);
+            editarCon(publicacion, datos);
+            publicacionRepository.save(publicacion);
+            return PublicacionMapper.aDTO(publicacion, autor);
+        });
     }
 
     public PublicacionDTO editar(String userId, String publicacionId, DatosPublicacionCommand datos) {
-        var publicacion = buscarPropia(userId, publicacionId, "editar");
-        editarCon(publicacion, datos);
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "editar", publicacion -> editarCon(publicacion, datos));
     }
 
     public PublicacionDTO agregarFranja(String userId, String publicacionId, Instant inicio, Instant fin) {
-        var publicacion = buscarPropia(userId, publicacionId, "agregar franjas a");
-        publicacion.agregarFranja(inicio, fin);
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "agregar franjas a",
+                publicacion -> publicacion.agregarFranja(inicio, fin));
     }
 
     /** Un perfil dado de baja no publica. Los requisitos para publicar los valida la {@link Publicacion}. */
     public PublicacionDTO publicar(String userId, String publicacionId) {
-        var publicacion = buscarPropia(userId, publicacionId, "publicar");
-        perfilActivo(userId, "publicar");
-        publicacion.publicar(userId, ahora());
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "publicar", publicacion -> {
+            perfilActivo(userId, "publicar");
+            publicacion.publicar(userId, ahora());
+        });
     }
 
     public PublicacionDTO pausar(String userId, String publicacionId, String motivo) {
-        var publicacion = buscarPropia(userId, publicacionId, "pausar");
-        publicacion.pausar(userId, motivo, ahora());
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "pausar", publicacion -> publicacion.pausar(userId, motivo, ahora()));
     }
 
     /** Igual que al publicar: un perfil dado de baja no vuelve a poner la publicación en PUBLICADA. */
     public PublicacionDTO reanudar(String userId, String publicacionId) {
-        var publicacion = buscarPropia(userId, publicacionId, "reanudar");
-        perfilActivo(userId, "reanudar");
-        publicacion.reanudar(userId, ahora());
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "reanudar", publicacion -> {
+            perfilActivo(userId, "reanudar");
+            publicacion.reanudar(userId, ahora());
+        });
     }
 
     public PublicacionDTO cerrar(String userId, String publicacionId, String motivo) {
-        var publicacion = buscarPropia(userId, publicacionId, "cerrar");
-        publicacion.cerrar(userId, motivo, ahora());
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "cerrar", publicacion -> publicacion.cerrar(userId, motivo, ahora()));
     }
 
     public PublicacionDTO cancelar(String userId, String publicacionId, String motivo) {
-        var publicacion = buscarPropia(userId, publicacionId, "cancelar");
-        publicacion.cancelar(userId, motivo, ahora());
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "cancelar", publicacion -> publicacion.cancelar(userId, motivo, ahora()));
     }
 
     public PublicacionDTO agregarPromocion(String userId, String publicacionId, PromocionDTO promocion) {
-        var publicacion = buscarPropia(userId, publicacionId, "agregar promociones a");
-        publicacion.agregarPromocion(PublicacionMapper.aPromocion(promocion));
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "agregar promociones a",
+                publicacion -> publicacion.agregarPromocion(PublicacionMapper.aPromocion(promocion)));
     }
 
     public PublicacionDTO quitarPromocion(String userId, String publicacionId, PromocionDTO promocion) {
-        var publicacion = buscarPropia(userId, publicacionId, "quitar promociones de");
-        publicacion.quitarPromocion(PublicacionMapper.aPromocion(promocion));
-        return guardar(publicacion);
+        return modificar(userId, publicacionId, "quitar promociones de",
+                publicacion -> publicacion.quitarPromocion(PublicacionMapper.aPromocion(promocion)));
     }
 
     /** Panel del autor: sus publicaciones en cualquier estado. */
@@ -161,9 +158,18 @@ public class PublicacionService {
         return perfil;
     }
 
-    private PublicacionDTO guardar(Publicacion publicacion) {
-        publicacionRepository.save(publicacion);
-        return aDTO(publicacion);
+    /**
+     * Lee la publicación del autor, le aplica el cambio y la guarda, todo en una transacción. Así el
+     * bloqueo optimista compara contra la versión que se leyó: si en el medio otra operación (por ejemplo,
+     * una aceptación que reservó cupo) la cambió, esta falla con un conflicto en lugar de pisar el cambio.
+     */
+    private PublicacionDTO modificar(String userId, String publicacionId, String accion, Consumer<Publicacion> cambio) {
+        return unidadDeTrabajo.ejecutar(() -> {
+            var publicacion = buscarPropia(userId, publicacionId, accion);
+            cambio.accept(publicacion);
+            publicacionRepository.save(publicacion);
+            return aDTO(publicacion);
+        });
     }
 
     private PublicacionDTO aDTO(Publicacion publicacion) {
