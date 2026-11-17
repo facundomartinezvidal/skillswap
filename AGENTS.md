@@ -62,30 +62,28 @@ mvn exec:java -Dexec.args="--screenshot out.png"
 ```
 src/main/java/ar/edu/uade/skillswap/
 ├── SkillSwapApplication.java          # main: instala Theme, crea MockSkillSwapControllers y abre la ventana
-├── domain/                            # Dominio Java puro (completo, ver abajo)
-│   ├── publicacion/                   # Publicacion, franjas, cupo; state/, decorator/ (promociones), exception/
-│   ├── contratacion/                  # Contratacion, Solicitud, Reintegro, Calificacion; state/, strategy/, evento/, exception/
-│   ├── wallet/                        # Wallet, Movimiento, RetencionDePagos; exception/
-│   ├── perfil/                        # Perfil, Reputacion, DisponibilidadSemanal, TipoPerfil, CanalNotificacion; exception/
-│   ├── notificacion/                  # Notificacion (bandeja); exception/
-│   └── shared/                        # SkillCoins, Puntaje, CambioEstado, EventoDominio, DomainException, TransicionInvalidaException
+├── domain/                            # Dominio Java puro (completo), con los puertos de repositorio
+├── application/                       # Casos de uso: un Service por flujo, DTOs y puertos (ver docs/arquitectura.md)
+├── infrastructure/                    # memoria/ (repos y unidad de trabajo en memoria), notificacion/ (adapters),
+│                                      # identidad/ (simulada), configuracion/BackendEnMemoria (composition root)
 ├── controllers/UiControllers.java     # CONTRATO entre la UI y el backend (interfaces de controllers)
 ├── mock/MockSkillSwapControllers.java # implementación en memoria con datos de demo
 ├── model/Models.java                  # records/enums que viajan entre la UI y los controllers
 └── ui/                                # SkillSwapView (pantallas) y Theme (colores y fuentes)
 src/main/resources/db/migration/V1__esquema_inicial.sql   # esquema inicial (todavía no alineado con el dominio)
 src/test/java/ar/edu/uade/skillswap/
-├── ArquitecturaTest.java              # regla de dependencias del dominio
-├── domain/                            # un test por agregado, value objects, estados, estrategias, decorator y eventos
+├── ArquitecturaTest.java              # reglas de dependencias de domain y application
+├── RecorridoCompletoTest.java         # la demo de punta a punta con BackendEnMemoria
+├── domain/  application/  infrastructure/
 └── mock/MockSkillSwapControllersTest.java
 ```
 
 - `UiControllers` agrupa las sub-interfaces `BusquedaController`, `PublicacionController`, `ContratacionController`, `WalletController`, `NotificacionController` y `PerfilController`.
 - `Models` son **modelos de vista** (records inmutables): `Perfil`, `Publicacion`, `Contratacion`, `Movimiento`, `Notificacion`, `FiltrosBusqueda` y los enums `Modalidad`, `EstadoPublicacion` y `EstadoContratacion`. **No** son entidades de dominio ni entidades JPA, y no deben tener lógica de negocio.
 - `Modalidad` tiene `HIBRIDA` además de `REMOTA` y `PRESENCIAL`, aunque la consigna solo menciona remota y presencial.
-- El usuario activo está hardcodeado en la UI (`USER_ID = "user-mateo"`), simulando el login mock.
-- **El dominio está completo; todavía no existen** la capa `application/` (casos de uso), `infrastructure/` (JPA, adapters), `persistence.xml` ni la conexión de la UI con el backend real. La UI sigue usando el mock.
-- `mvn test` corre 345 tests. El detalle de cada agregado está en [`docs/arquitectura.md`](docs/arquitectura.md).
+- El usuario activo está hardcodeado en la UI (`USER_ID = "user-mateo"`), simulando el login mock. `ServicioIdentidadSimulado` lo conoce.
+- **El dominio y la capa de aplicación están completos** (PRs #12 a #18). **Todavía no existen** la persistencia JPA (`persistence.xml`, entidades, repositorios JPA) ni los controllers reales: la UI sigue usando el mock. Mientras tanto, `BackendEnMemoria` arma todos los Services con la implementación en memoria.
+- `mvn test` corre 495 tests. El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ### Decisiones de dominio acordadas
 
@@ -100,18 +98,28 @@ Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y
 - **Wallet:** el pago queda **retenido** en una Wallet de garantía de la plataforma (`Wallet.TITULAR_GARANTIA`) hasta completar; al cancelar, la garantía reparte según el `Reintegro`. `RetencionDePagos` agrupa cada débito con su crédito. Saldo inicial: bono de bienvenida que pasa `main`, más `acreditarDemo`. La Wallet guarda solo los movimientos nuevos; el listado lo hará el repositorio.
 - **Perfil:** `TipoPerfil` (`PROFESIONAL` u `ORGANIZACION`) fijo desde la creación; la baja lógica queda en el historial y un perfil dado de baja rechaza ediciones pero sigue recibiendo calificaciones.
 - **Eventos y notificaciones:** `Contratacion` registra un `EventoDominio` por cada operación válida (solicitud, aceptación, pago, reprogramación propuesta y aceptada, cancelación, sesión completada); cada evento declara sus interesados. El caso de uso los toma con `extraerEventos()` después de guardar. `Notificacion` es genérica y solo su destinatario la marca como leída; el canal no es parte de la notificación.
-- **Patrones implementados:** State (estados de publicación y contratación), Strategy + Simple Factory (políticas de reintegro), Decorator (promociones sobre el precio). Observer tiene listo el dominio (eventos); faltan el publicador y los suscriptores. Adapter queda para infraestructura.
+- **Patrones implementados:** State (estados de publicación y contratación), Strategy (políticas de reintegro y recomendaciones), Simple Factory (política de reintegro y canal de envío), Decorator (promociones), Observer (`PublicadorEventos` y `NotificadorDeInteresados`) y Adapter (email, push e identidad simulados). Ver la tabla en `docs/arquitectura.md`.
 
-### Próximo hito: capa de aplicación
+### Próximo hito: persistencia y controllers
 
-- Casos de uso que coordinan agregados en una transacción: pagar (`Contratacion.pagar` + `RetencionDePagos.retener`), completar (`completar` + `liberarAlProveedor`), cancelar (`cancelar` + `repartir`), calificar (`calificar` + `Perfil.registrarCalificacion`), solicitar con `publicacion.precioFinal()` (el cupo se reserva al **aceptar**, no al solicitar, como pide la consigna), y crear el borrador con el `TipoPublicacion` que corresponde al `TipoPerfil` del autor (profesional → oferta, organización → desafío), así nunca pueden no coincidir.
-- Publicador de eventos y suscriptores (Observer), elección del canal según el perfil (Simple Factory) y adapters mock de email y push (Adapter), para cubrir el caso de aceptación 8.
-- Implementaciones en memoria de los repositorios para testear los casos de uso.
-- Pendientes de persistencia: alinear `V1` con el dominio (identidad por `userId`, Wallet de garantía sin perfil, tipo de perfil), reconstruir los agregados desde la base y bloqueo optimista sobre la fila de la garantía.
+- **Persistencia (JPA y MySQL):**
+  - Implementar los repositorios del dominio, `BuscadorPublicaciones` (una consulta con join a perfiles, sin N+1) y `UnidadDeTrabajo` con `EntityTransaction`.
+  - Mapear con `reconstruir(...)`.
+  - Alinear `V1` con el dominio (identidad por `userId`, Wallet de garantía sin perfil, tipo de perfil).
+  - `@Version` en publicación (cupo) y en la Wallet de garantía.
+  - Armar otro composition root igual a `BackendEnMemoria`, con los repositorios JPA.
+- **Controllers:** implementar `UiControllers` sobre los Services de `BackendEnMemoria`. Mapear DTOs a `Models` y atrapar `DomainException` y `ApplicationException` de forma uniforme. Ver "Qué le falta al contrato actual" más abajo.
 
 ### Capa de aplicación: acuerdos
 
-- Las firmas de los Services y los puertos (PR #12) son el contrato para persistencia y controllers. Mientras un Service lance `UnsupportedOperationException("Pendiente…")`, **ningún controller lo usa**: se conecta recién cuando su PR de implementación está mergeado.
+- Las firmas de los Services y los puertos (PR #12) son el contrato para persistencia y controllers. Todos los Services están implementados (PRs #14 a #17); un controller se conecta a un Service recién cuando su PR está mergeado.
+- Checklist que pidió la revisión, para código nuevo:
+  - Las reglas que dependen del estado las responde el dominio, no una lista de nombres en el Service.
+  - Adentro de una `UnidadDeTrabajo`, primero se modifican todos los agregados y los `save` van al final.
+  - Los DTOs copian sus colecciones.
+  - Los listados no hacen N+1 (`findByIds`, `findByUserIds`).
+  - Todas las operaciones publican sus eventos.
+  - En los `reconstruir`, nulos con mensaje y colecciones vacías.
 - **Limitación conocida:** `PublicacionRepository.findPublicadas()` no tiene límite (las recomendaciones cargan todas las publicadas). Alcanza para el volumen del TP; con muchos datos, habría que acotar las candidatas en la consulta.
 
 ### Qué le falta al contrato actual respecto de la consigna

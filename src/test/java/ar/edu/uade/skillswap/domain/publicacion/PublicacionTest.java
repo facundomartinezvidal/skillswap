@@ -479,6 +479,17 @@ class PublicacionTest {
         }
 
         @Test
+        void unaPublicacionCerradaCanceladaOEnBorradorNoAdmiteReservas() {
+            for (var publicacion : List.of(cerrada(), cancelada(), borradorCompleto(1))) {
+                var franja = publicacion.franjas().get(0).id();
+
+                assertThrows(TransicionInvalidaException.class, () -> publicacion.reservarCupo(franja),
+                        publicacion.estado().nombre());
+                assertEquals(0, reservados(publicacion, franja));
+            }
+        }
+
+        @Test
         void reservarEnUnaFranjaAjenaFalla() {
             var publicacion = publicada();
 
