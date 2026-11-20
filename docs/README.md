@@ -22,6 +22,8 @@ Transcripción de `tpo-consignas.pdf` (no se versiona; cada integrante lo tiene 
 | [informe-decisiones.md](informe-decisiones.md) | Informe de decisiones (problema → alternativa → consecuencias → evidencia), patrones, SOLID/GRASP, casos de aceptación y cobertura |
 | [decisiones-capa-aplicacion.md](decisiones-capa-aplicacion.md) | Detalle de las decisiones de la capa de aplicación |
 | [diagramas.md](diagramas.md) | Diagramas de clases en Mermaid |
+| [uml/diagrama-clases-uml.png](uml/diagrama-clases-uml.png) | Diagrama de clases UML de dominio y aplicación, con multiplicidades y patrones (fuente en `.puml`, también en `.svg`). Es la base para el modelo en StarUML |
+| [historias-de-usuario.md](historias-de-usuario.md) | Historias de usuario del Hito 1, con criterios de aceptación y los tests que los verifican |
 | [demo.md](demo.md) | Guion de la demo |
 | [plan-de-trabajo.md](plan-de-trabajo.md) | Estado por hito y PRs |
 | [pendientes-equipo.md](pendientes-equipo.md) | Lo que falta o se puede mejorar según la revisión contra la consigna: botón Calificar, bug de RECHAZADA, StarUML, historias e informe PDF |
