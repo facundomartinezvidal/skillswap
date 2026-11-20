@@ -1,11 +1,13 @@
 package ar.edu.uade.skillswap.controllers.impl;
 
 import ar.edu.uade.skillswap.application.contratacion.ContratacionService;
+import ar.edu.uade.skillswap.application.contratacion.dto.CambioEstadoDTO;
 import ar.edu.uade.skillswap.application.contratacion.dto.ContratacionDTO;
 import ar.edu.uade.skillswap.application.contratacion.dto.SolicitarContratacionCommand;
 import ar.edu.uade.skillswap.application.perfil.PerfilService;
 import ar.edu.uade.skillswap.application.publicacion.PublicacionService;
 import ar.edu.uade.skillswap.application.publicacion.dto.FranjaDTO;
+import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoException;
 import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
 import ar.edu.uade.skillswap.controllers.PaginaVista;
@@ -14,6 +16,8 @@ import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.Contratacion;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +30,7 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
 
     /** La UI de la cátedra no pide motivo al cancelar. */
     static final String MOTIVO_POR_DEFECTO = "Cambio desde la aplicación";
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final ContratacionService contratacionService;
     private final PublicacionService publicacionService;
@@ -164,6 +169,51 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
     @Override
     public Contratacion rechazarReprogramacion(String userId, String contratacionId) {
         return ejecutar(() -> aModelo(userId, contratacionService.rechazarReprogramacion(userId, contratacionId)));
+    }
+
+    @Override
+    public List<String> verHistorial(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var nombres = new HashMap<String, String>();
+            return contratacionService.verContratacion(userId, contratacionId).historial().stream()
+                    .map(cambio -> lineaDeHistorial(cambio, nombres))
+                    .toList();
+        });
+    }
+
+    @Override
+    public boolean esCliente(String userId, String contratacionId) {
+        return ejecutar(() -> contratacionService.verContratacion(userId, contratacionId).clienteId().equals(userId));
+    }
+
+    /** RECHAZADA es un estado final: no se reabre, se crea una solicitud nueva sobre la misma publicación. */
+    @Override
+    public Contratacion volverASolicitar(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var rechazada = contratacionService.verContratacion(userId, contratacionId);
+            if (!"RECHAZADA".equals(rechazada.estado()) || !rechazada.clienteId().equals(userId)) {
+                throw new OperacionRechazadaException(
+                        "Solo el cliente puede volver a solicitar, y solo una contratación RECHAZADA");
+            }
+            return solicitar(userId, rechazada.publicacionId(), "Vuelvo a solicitar después del rechazo");
+        });
+    }
+
+    private String lineaDeHistorial(CambioEstadoDTO cambio, Map<String, String> nombres) {
+        var fecha = LocalDateTime.ofInstant(cambio.fecha(), clock.getZone()).format(FORMATO_FECHA);
+        var desde = cambio.desde() == null ? "" : cambio.desde() + " → ";
+        var actor = nombres.computeIfAbsent(cambio.actorId(), this::nombreVisible);
+        var motivo = cambio.motivo() == null || cambio.motivo().isBlank() ? "" : " · " + cambio.motivo();
+        return fecha + " · " + desde + cambio.hacia() + " · " + actor + motivo;
+    }
+
+    /** El actor puede no tener perfil (por ejemplo, un proceso del sistema): se muestra su id. */
+    private String nombreVisible(String userId) {
+        try {
+            return perfilService.verPerfil(userId).nombreVisible();
+        } catch (RecursoNoEncontradoException e) {
+            return userId;
+        }
     }
 
     private Contratacion aModelo(String userId, ContratacionDTO contratacion) {

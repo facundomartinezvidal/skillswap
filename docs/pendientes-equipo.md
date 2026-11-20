@@ -6,7 +6,7 @@ Cada punto dice qué pasa, por qué importa y por dónde empezar.
 
 ## Roto
 
-### 1. No se puede calificar desde la UI
+### 1. ~~No se puede calificar desde la UI~~ (resuelto: botón "Calificar" en las filas COMPLETADA)
 
 - **Qué pasa:** la demo en vivo tiene que recorrer publicar → solicitar → aceptar → pagar → completar → **calificar** (`07-entregas-pruebas-y-evaluacion.md`), pero la pantalla de contrataciones no tiene un botón para calificar. Hoy el caso 10 solo se ve en `CasosDeAceptacionTest`.
 - **Qué hacer:** agregar un botón **"Calificar"** en las filas `COMPLETADA` de `showContracts()` (`ui/SkillSwapView.java`). El botón pide un puntaje del 1 al 5 (y un comentario opcional) con `JOptionPane` y llama a `CalificacionController.calificar(userId, contratacionId, puntaje, comentario)` dentro de `intentar(...)`, que ya muestra los errores.
@@ -15,14 +15,14 @@ Cada punto dice qué pasa, por qué importa y por dónde empezar.
 
 ## Bug
 
-### 2. Las contrataciones RECHAZADAS muestran botones que siempre fallan
+### 2. ~~Las contrataciones RECHAZADAS muestran botones que siempre fallan~~ (resuelto: "Ver historial" en RECHAZADA y CANCELADA, y "Volver a solicitar" para el cliente en RECHAZADA)
 
 - **Qué pasa:** en `showContracts()` los botones "Avanzar estado" y "Cancelar" se ocultan solo en `COMPLETADA` y `CANCELADA`. Una contratación `RECHAZADA` los muestra, y al tocarlos sale un error.
 - **Qué hacer:** ocultarlos también para `RECHAZADA`.
 
 ## Mejorable
 
-### 3. Falta el orden "Más reciente" en el buscador
+### 3. ~~Falta el orden "Más reciente" en el buscador~~ (resuelto)
 
 El backend soporta los cuatro órdenes que pide la consigna (`OrdenBusqueda`, y `BusquedaControllerImpl.aOrden` ya reconoce el texto `"Más reciente"`), pero el combo de `showExploreWith()` solo ofrece tres. Basta con agregar `"Más reciente"` al arreglo del combo.
 
