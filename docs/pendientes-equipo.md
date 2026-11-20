@@ -26,13 +26,13 @@ Cada punto dice qué pasa, por qué importa y por dónde empezar.
 
 El backend soporta los cuatro órdenes que pide la consigna (`OrdenBusqueda`, y `BusquedaControllerImpl.aOrden` ya reconoce el texto `"Más reciente"`), pero el combo de `showExploreWith()` solo ofrece tres. Basta con agregar `"Más reciente"` al arreglo del combo.
 
-### 4. Diagrama de clases en StarUML
+### 4. Diagrama de clases en StarUML (base lista: `docs/uml/diagrama-clases-uml.png`; falta pasarlo a StarUML)
 
 - La consigna pide el diagrama de dominio y aplicación **en StarUML**, con relaciones, multiplicidades y patrones identificados.
 - `docs/SkillSwap.mdj` se generó desde el código y el JSON es válido, pero **nunca se abrió en StarUML** (no había licencia) y los elementos quedaron acomodados en grilla.
 - **Qué hacer:** abrirlo en StarUML, ordenar el layout por módulo, revisar las multiplicidades y marcar los patrones (State, Strategy, Simple Factory, Decorator, Observer, Adapter). Como referencia sirven `docs/diagrama-clases.png` y los Mermaid de `docs/diagramas.md`. Si es más fácil, rehacerlo a mano a partir de esos diagramas.
 
-### 5. Historias de usuario
+### 5. ~~Historias de usuario~~ (resuelto: `docs/historias-de-usuario.md`)
 
 El hito 1 pide "alcance, historias…", pero no hay un documento de historias. Un `docs/historias-de-usuario.md` corto alcanza: una historia por flujo (perfil, publicar, buscar, contratar, pagar, cancelar, calificar, notificaciones), con su criterio de aceptación enlazado al caso de `CasosDeAceptacionTest`.
 
