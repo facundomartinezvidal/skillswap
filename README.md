@@ -91,6 +91,7 @@ src/main/java/ar/edu/uade/skillswap/
 
 ## Documentación
 
+- [`docs/guia-levantar-proyecto.md`](docs/guia-levantar-proyecto.md): paso a paso para instalar, abrir la app y correr los tests desde cero.
 - [`docs/arquitectura.md`](docs/arquitectura.md): capas, casos de uso, patrones y persistencia.
 - [`docs/informe-decisiones.md`](docs/informe-decisiones.md): decisiones en formato
   problema → alternativa → consecuencias → evidencia, patrones, SOLID/GRASP y casos de aceptación.
