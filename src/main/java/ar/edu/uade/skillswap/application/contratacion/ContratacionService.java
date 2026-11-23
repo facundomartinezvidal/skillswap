@@ -96,6 +96,17 @@ public class ContratacionService {
     }
 
     /**
+     * Después de un rechazo, el cliente pide de nuevo la misma publicación con el mismo objetivo, en la
+     * franja que indica. La rechazada no se reabre: el dominio valida quién y desde qué estado.
+     */
+    public ContratacionDTO volverASolicitar(String userId, String contratacionId, String franjaId, String mensaje) {
+        var anterior = buscar(contratacionId);
+        anterior.validarNuevaSolicitud(userId);
+        return solicitar(new SolicitarContratacionCommand(userId, anterior.publicacionId().valor().toString(),
+                franjaId, mensaje, anterior.solicitud().objetivo()));
+    }
+
+    /**
      * El proveedor acepta y se reserva el cupo de la franja, en una transacción. Funciona aunque la
      * publicación esté pausada: pausar corta las solicitudes nuevas, no las que ya llegaron.
      */

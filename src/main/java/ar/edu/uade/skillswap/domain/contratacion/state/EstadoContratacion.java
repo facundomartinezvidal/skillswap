@@ -51,4 +51,9 @@ public sealed interface EstadoContratacion
     default boolean admiteCalificacion() {
         return false;
     }
+
+    /** Si el cliente puede volver a pedir la misma publicación: se crea otra contratación, esta no se reabre. */
+    default boolean admiteNuevaSolicitud() {
+        return false;
+    }
 }

@@ -70,17 +70,22 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
     @Override
     public Contratacion solicitar(String userId, String publicacionId, String objetivo) {
         return ejecutar(() -> {
-            var franjas = publicacionService.verPublicacion(userId, publicacionId).franjas().stream()
-                    .sorted(Comparator.comparing(FranjaDTO::inicio))
-                    .toList();
-            var elegida = franjas.stream()
-                    .filter(f -> f.lugaresLibres() > 0 && f.inicio().isAfter(clock.instant()))
-                    .findFirst()
-                    .or(() -> franjas.stream().findFirst())
-                    .orElseThrow(() -> new OperacionRechazadaException("La publicación no tiene franjas disponibles"));
-            var command = new SolicitarContratacionCommand(userId, publicacionId, elegida.id(), objetivo, objetivo);
+            var command = new SolicitarContratacionCommand(userId, publicacionId,
+                    franjaParaSolicitar(userId, publicacionId), objetivo, objetivo);
             return aModelo(userId, contratacionService.solicitar(command));
         });
+    }
+
+    private String franjaParaSolicitar(String userId, String publicacionId) {
+        var franjas = publicacionService.verPublicacion(userId, publicacionId).franjas().stream()
+                .sorted(Comparator.comparing(FranjaDTO::inicio))
+                .toList();
+        return franjas.stream()
+                .filter(f -> f.lugaresLibres() > 0 && f.inicio().isAfter(clock.instant()))
+                .findFirst()
+                .or(() -> franjas.stream().findFirst())
+                .orElseThrow(() -> new OperacionRechazadaException("La publicación no tiene franjas disponibles"))
+                .id();
     }
 
     /**
@@ -186,16 +191,14 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
         return ejecutar(() -> contratacionService.verContratacion(userId, contratacionId).clienteId().equals(userId));
     }
 
-    /** RECHAZADA es un estado final: no se reabre, se crea una solicitud nueva sobre la misma publicación. */
+    /** Quién puede y desde qué estado lo decide el dominio; acá solo se elige la franja, como en {@link #solicitar}. */
     @Override
     public Contratacion volverASolicitar(String userId, String contratacionId) {
         return ejecutar(() -> {
-            var rechazada = contratacionService.verContratacion(userId, contratacionId);
-            if (!"RECHAZADA".equals(rechazada.estado()) || !rechazada.clienteId().equals(userId)) {
-                throw new OperacionRechazadaException(
-                        "Solo el cliente puede volver a solicitar, y solo una contratación RECHAZADA");
-            }
-            return solicitar(userId, rechazada.publicacionId(), "Vuelvo a solicitar después del rechazo");
+            var anterior = contratacionService.verContratacion(userId, contratacionId);
+            var franja = franjaParaSolicitar(userId, anterior.publicacionId());
+            return aModelo(userId, contratacionService.volverASolicitar(userId, contratacionId, franja,
+                    "Vuelvo a solicitar después del rechazo"));
         });
     }
 
