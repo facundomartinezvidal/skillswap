@@ -254,15 +254,15 @@ Los diez casos también se recorren de punta a punta a través de los controller
 
 ## 9. Pruebas y cobertura
 
-- `mvn test` con Java 17: **573 tests, 0 fallos**. Los 26 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y se omiten si Docker no está disponible; en CI se ejecutan.
+- `mvn test` con Java 17: **579 tests, 0 fallos**. Los 26 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y se omiten si Docker no está disponible; en CI se ejecutan.
 - Cobertura medida con JaCoCo (`target/site/jacoco/index.html`), sin excluir clases:
 
 | Capa | Líneas | Ramas |
 |---|---|---|
-| Dominio | 99,7 % (939/942) | 96,1 % (271/282) |
-| Aplicación | 99,0 % (498/503) | 91,4 % (85/93) |
-| **Dominio + aplicación** | **99,4 % (1437/1445)** | **94,9 % (356/375)** |
-| Controllers | 91,7 % (232/253) | 73,9 % (65/88) |
+| Dominio | 99,7 % (945/948) | 96,1 % (273/284) |
+| Aplicación | 99,4 % (504/507) | 91,4 % (85/93) |
+| **Dominio + aplicación** | **99,6 % (1449/1455)** | **95,0 % (358/377)** |
+| Controllers | 91,7 % (233/254) | 72,6 % (61/84) |
 
 - `mvn verify` falla si dominio + aplicación bajan del 80 % de líneas (`jacoco:check`).
 - La infraestructura medida sin Docker da 36 % porque sus tests de MySQL quedan omitidos; la UI y el mock de la cátedra no se miden como objetivo.
