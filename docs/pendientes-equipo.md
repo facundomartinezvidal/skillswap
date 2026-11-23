@@ -40,21 +40,22 @@ El hito 1 pide "alcance, historias…", pero no hay un documento de historias. U
 
 La consigna pide el informe de decisiones en PDF. `docs/informe-decisiones.md` está completo, pero falta exportarlo (desde VS Code o Word) y entregarlo. El PDF no se versiona (los `.pdf` están en `.gitignore`).
 
-### 7. Comprobante de la contratación completada (opcional)
+### 7. ~~Comprobante de la contratación completada~~ (resuelto: botón "Comprobante" en las filas COMPLETADA)
 
 En `COMPLETADA` la consigna menciona "consultar comprobante". `ContratacionDTO` ya trae el comprobante, pero la UI no lo muestra. Mostrarlo es opcional.
 
 ### 8. Tests de MySQL
 
-Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no anda, se omiten. En el CI de GitHub corren. Antes de la defensa conviene correr `mvn test` en una máquina con Docker funcionando y confirmar que pasan los 580.
+Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no anda, se omiten. En el CI de GitHub corren. Antes de la defensa conviene correr `mvn test` en una máquina con Docker funcionando y confirmar que pasan los 606.
 
 ## Estado al 23/11 (entrega: martes 24/11)
 
 **Hecho**
 
-- Todas las PRs (#4 a #30) están en `main`, con CI en verde: 580 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas y 95,0 % de ramas.
+- Todas las PRs (#4 a #31) están en `main`, con CI en verde: 606 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas y 95,0 % de ramas.
 - Puntos 1, 2, 3 y 5 resueltos (PR #26 y #27). La regla de "volver a solicitar" quedó en el dominio (`Contratacion.validarNuevaSolicitud` y `admiteNuevaSolicitud()` del State).
 - UI: "Cambiar usuario" en la barra lateral (#29) y precio en el formulario de nueva publicación (#30).
+- Revisión contra el PDF (#31): solicitar con franja, mensaje y objetivo (4.4); franjas y cupo cargados por el autor al crear la publicación; botones concretos en Contrataciones, más Rechazar, Reprogramar y Comprobante; listados de publicaciones propias y recomendaciones paginados; `correr.sh`.
 - Diagrama UML base en `docs/uml/`, historias de usuario y la guía [`guia-levantar-proyecto.md`](guia-levantar-proyecto.md).
 
 **Falta, en este orden**
@@ -63,4 +64,4 @@ Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no 
 2. **Informe en PDF** (punto 6): exportar `docs/informe-decisiones.md` y sumarle el diagrama de StarUML.
 3. **Limpieza final del repo**: sacar `AGENTS.md`, la carpeta `.claude/` y `skills-lock.json`, que solo sirven para el desarrollo, y los enlaces que apuntan a ellos.
 
-Los puntos 7 (comprobante) y 8 (tests de MySQL con Docker) son opcionales.
+El punto 8 (tests de MySQL con Docker) es opcional: con Docker andando pasan los 606.

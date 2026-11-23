@@ -92,7 +92,7 @@ src/test/java/ar/edu/uade/skillswap/
 - `Modalidad` tiene `HIBRIDA` además de `REMOTA` y `PRESENCIAL`, aunque la consigna solo menciona remota y presencial.
 - El usuario activo simula el login mock: por defecto `user-mateo`, otro con `--usuario <userId>`, y con la app abierta se cambia desde **⇄ Cambiar usuario** en la barra lateral (ofrece `DatosDemo.USUARIOS`; `main` vuelve a armar la vista en la misma ventana y con el mismo backend). `ServicioIdentidadSimulado` conoce a todos los usuarios de `DatosDemo`.
 - **El backend está completo** (PRs #12 a #24, encadenados): dominio, aplicación, persistencia JPA (`BackendJpa` contra MySQL con `DB_URL`, `DB_USER`, `DB_PASSWORD`; por defecto el MySQL del `docker-compose.yml`), controllers reales y la UI conectada. Sin argumentos la app usa MySQL; con `--memoria`, `BackendEnMemoria`. En los dos casos `DatosDemo` carga la demo una sola vez.
-- `mvn test` corre 564 tests. Los 24 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y quedan deshabilitados si Docker no está disponible. Cobertura de dominio + aplicación: 99,4 % de líneas y 95,3 % de ramas (JaCoCo). El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md) y las decisiones en [`docs/informe-decisiones.md`](docs/informe-decisiones.md).
+- `mvn test` corre 606 tests. Los 26 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y quedan deshabilitados si Docker no está disponible. Cobertura de dominio + aplicación: 99,6 % de líneas y 95,0 % de ramas (JaCoCo). El detalle está en [`docs/arquitectura.md`](docs/arquitectura.md) y las decisiones en [`docs/informe-decisiones.md`](docs/informe-decisiones.md).
 
 - **Pendientes:** lo que falta según la revisión contra la consigna (botón Calificar en la UI, bug de las contrataciones RECHAZADAS, orden "Más reciente", diagrama en StarUML, historias de usuario e informe en PDF) está en [`docs/pendientes-equipo.md`](docs/pendientes-equipo.md).
 
@@ -131,7 +131,7 @@ Antes de cambiar alguna, consultarlo con el equipo. Todas están implementadas y
 
 ### Qué cubren las interfaces del equipo
 
-Lo que la consigna pide y `UiControllers` no tenía ya está implementado y probado: `ContratacionOperaciones` (aceptar, rechazar, pagar, iniciar, completar, cancelar con motivo, reprogramar), `RecomendacionController`, `CalificacionController`, `PerfilOperaciones` (crear, editar, disponibilidad, canal y baja), `PublicacionOperaciones` (franjas y descuentos), `BusquedaOperaciones` (rango de precio, habilidad, reputación mínima, cuatro órdenes) y listados paginados (`PaginaVista<T>`). La UI de la cátedra no tiene botones para calificar, reprogramar ni cargar franjas.
+Lo que la consigna pide y `UiControllers` no tenía ya está implementado y probado: `ContratacionOperaciones` (solicitar con franja y mensaje, aceptar, rechazar, pagar, iniciar, completar, cancelar con motivo, reprogramar, paso siguiente, comprobante), `RecomendacionController`, `CalificacionController`, `PerfilOperaciones` (crear, editar, disponibilidad, canal y baja), `PublicacionOperaciones` (crear con cupo y franjas, listar franjas, descuentos), `BusquedaOperaciones` (rango de precio, habilidad, reputación mínima, cuatro órdenes) y listados paginados (`PaginaVista<T>`). La vista usa estas interfaces para elegir franja al solicitar, cargar franjas y cupo al publicar, y para los botones concretos de Contrataciones (Rechazar, Reprogramar, Comprobante, Calificar). Solo cambiar la estrategia de recomendación queda sin botón.
 
 ## Convenciones
 

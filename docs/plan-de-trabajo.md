@@ -36,7 +36,7 @@ Estado por hito al 23/11/2026 (entrega: martes 24/11). ✅ hecho · ⬜ pendient
 
 ## Criterios de terminado
 
-- ✅ `mvn verify` pasa con Java 17: 580 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas cubiertas.
+- ✅ `mvn verify` pasa con Java 17: 606 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas cubiertas.
 - ✅ El dominio y la aplicación se prueban sin Swing, MySQL ni Hibernate.
 - ✅ Todas las búsquedas y listados se paginan; las mutaciones respetan permisos, transacciones e historial de estados.
 - ✅ No se usa Spring, REST ni `hbm2ddl.auto=create`.

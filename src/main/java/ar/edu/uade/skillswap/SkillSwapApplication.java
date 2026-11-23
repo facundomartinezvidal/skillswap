@@ -69,7 +69,8 @@ public final class SkillSwapApplication {
      */
     private static void mostrarVista(JFrame frame, SkillSwapControllers controllers, String usuario) {
         frame.setContentPane(new SkillSwapView(controllers, usuario, controllers.calificaciones(),
-                controllers.contrataciones(), DatosDemo.USUARIOS, elegido -> mostrarVista(frame, controllers, elegido)));
+                controllers.contrataciones(), controllers.publicaciones(), DatosDemo.USUARIOS,
+                elegido -> mostrarVista(frame, controllers, elegido)));
         frame.revalidate();frame.repaint();
     }
 

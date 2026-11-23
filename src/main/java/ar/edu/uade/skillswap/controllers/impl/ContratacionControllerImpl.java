@@ -11,13 +11,17 @@ import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoExc
 import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
 import ar.edu.uade.skillswap.controllers.PaginaVista;
+import ar.edu.uade.skillswap.controllers.FranjaVista;
+import ar.edu.uade.skillswap.controllers.PasoSiguienteVista;
 import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.Contratacion;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -76,12 +80,19 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
         });
     }
 
+    @Override
+    public Contratacion solicitar(String userId, String publicacionId, String franjaId, String mensaje,
+                                  String objetivo) {
+        return ejecutar(() -> aModelo(userId, contratacionService.solicitar(
+                new SolicitarContratacionCommand(userId, publicacionId, franjaId, mensaje, objetivo))));
+    }
+
     private String franjaParaSolicitar(String userId, String publicacionId) {
         var franjas = publicacionService.verPublicacion(userId, publicacionId).franjas().stream()
                 .sorted(Comparator.comparing(FranjaDTO::inicio))
                 .toList();
         return franjas.stream()
-                .filter(f -> f.lugaresLibres() > 0 && f.inicio().isAfter(clock.instant()))
+                .filter(f -> ModelosMapper.estaDisponible(f, clock.instant()))
                 .findFirst()
                 .or(() -> franjas.stream().findFirst())
                 .orElseThrow(() -> new OperacionRechazadaException("La publicación no tiene franjas disponibles"))
@@ -97,22 +108,129 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
     public Contratacion avanzar(String userId, String contratacionId) {
         return ejecutar(() -> {
             var actual = contratacionService.verContratacion(userId, contratacionId);
-            var esProveedor = actual.proveedorId().equals(userId);
-            var esCliente = actual.clienteId().equals(userId);
-            ContratacionDTO resultado;
-            if ("PENDIENTE".equals(actual.estado()) && esProveedor) {
-                resultado = contratacionService.aceptar(userId, contratacionId);
-            } else if ("ACEPTADA".equals(actual.estado()) && esCliente) {
-                resultado = contratacionService.pagar(userId, contratacionId);
-            } else if ("CONFIRMADA".equals(actual.estado()) && esProveedor) {
-                resultado = contratacionService.iniciar(userId, contratacionId);
-            } else if ("EN_CURSO".equals(actual.estado()) && esProveedor) {
-                resultado = contratacionService.completar(userId, contratacionId);
-            } else {
+            var paso = pasoDe(actual, userId);
+            if (paso == null) {
                 throw new OperacionRechazadaException(sinPasoSiguiente(actual.estado()));
             }
+            var resultado = switch (paso) {
+                case ACEPTAR -> contratacionService.aceptar(userId, contratacionId);
+                case PAGAR -> contratacionService.pagar(userId, contratacionId);
+                case INICIAR -> contratacionService.iniciar(userId, contratacionId);
+                case COMPLETAR -> contratacionService.completar(userId, contratacionId);
+            };
             return aModelo(userId, resultado);
         });
+    }
+
+    /** Lo que hace {@link #avanzar} según el estado y quién lo pide. */
+    private enum Paso { ACEPTAR, PAGAR, INICIAR, COMPLETAR }
+
+    /** El paso que le toca a {@code userId}, o null si no le toca ninguno. */
+    private static Paso pasoDe(ContratacionDTO c, String userId) {
+        var esProveedor = c.proveedorId().equals(userId);
+        var esCliente = c.clienteId().equals(userId);
+        return switch (c.estado()) {
+            case "PENDIENTE" -> esProveedor ? Paso.ACEPTAR : null;
+            case "ACEPTADA" -> esCliente ? Paso.PAGAR : null;
+            case "CONFIRMADA" -> esProveedor ? Paso.INICIAR : null;
+            case "EN_CURSO" -> esProveedor ? Paso.COMPLETAR : null;
+            default -> null;
+        };
+    }
+
+    @Override
+    public PasoSiguienteVista pasoSiguiente(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var c = contratacionService.verContratacion(userId, contratacionId);
+            var esCliente = c.clienteId().equals(userId);
+            var otro = nombreContraparte(userId, c, new HashMap<>());
+            var paso = pasoDe(c, userId);
+            var accion = paso == null ? null : switch (paso) {
+                case ACEPTAR -> "Aceptar";
+                case PAGAR -> "Pagar " + c.precioAcordado() + " SkillCoins";
+                case INICIAR -> "Iniciar sesión";
+                case COMPLETAR -> "Completar sesión";
+            };
+            var propuesta = c.propuesta();
+            var detalle = detalle(c.estado(), esCliente, otro);
+            if (propuesta == null) {
+                return new PasoSiguienteVista(esCliente ? "Cliente" : "Proveedor", accion, detalle, null, false);
+            }
+            var porMi = propuesta.propuestaPor().equals(userId);
+            var nuevoInicio = ModelosMapper.aFecha(propuesta.inicio());
+            var cuando = nuevoInicio.format(FORMATO_FECHA);
+            detalle += porMi ? " Propusiste pasar la sesión al " + cuando + ": falta que " + otro + " responda."
+                    : " " + otro + " propuso pasar la sesión al " + cuando + ".";
+            return new PasoSiguienteVista(esCliente ? "Cliente" : "Proveedor", accion, detalle, nuevoInicio, porMi);
+        });
+    }
+
+    @Override
+    public List<String> verComprobante(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var c = contratacionService.verContratacion(userId, contratacionId);
+            var nombres = new HashMap<String, String>();
+            var lineas = new ArrayList<String>();
+            lineas.add("Contratación " + c.id());
+            lineas.add("Publicación: " + c.tituloPublicacion());
+            lineas.add("Cliente: " + nombres.computeIfAbsent(c.clienteId(), this::nombreVisible));
+            lineas.add("Proveedor: " + nombres.computeIfAbsent(c.proveedorId(), this::nombreVisible));
+            lineas.add("Sesión: " + ModelosMapper.aFecha(c.inicioSesion()).format(FORMATO_FECHA));
+            lineas.add("Importe: " + c.precioAcordado() + " SkillCoins");
+            lineas.add("Estado: " + c.estado());
+            for (var cambio : c.historial()) {
+                switch (cambio.hacia()) {
+                    case "CONFIRMADA" -> lineas.add("Pagado el " + fecha(cambio.fecha()));
+                    case "COMPLETADA" -> lineas.add("Completada el " + fecha(cambio.fecha()));
+                    case "CANCELADA" -> lineas.add("Cancelada el " + fecha(cambio.fecha()));
+                    default -> { }
+                }
+            }
+            if (c.reintegro() != null) {
+                lineas.add("Reintegro: " + c.reintegro().alCliente() + " SkillCoins al cliente y "
+                        + c.reintegro().alProveedor() + " al proveedor");
+            }
+            for (var calificacion : c.calificaciones()) {
+                var comentario = calificacion.comentario() == null || calificacion.comentario().isBlank()
+                        ? "" : " · " + calificacion.comentario();
+                lineas.add("Calificación de " + nombres.computeIfAbsent(calificacion.autorId(), this::nombreVisible)
+                        + ": " + calificacion.puntaje() + "/5" + comentario);
+            }
+            return List.copyOf(lineas);
+        });
+    }
+
+    private String fecha(Instant instante) {
+        return ModelosMapper.aFecha(instante).format(FORMATO_FECHA);
+    }
+
+    @Override
+    public List<FranjaVista> listarFranjasParaReprogramar(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var c = contratacionService.verContratacion(userId, contratacionId);
+            var ahora = clock.instant();
+            return publicacionService.verPublicacion(userId, c.publicacionId()).franjas().stream()
+                    .filter(f -> !f.id().equals(c.franjaId()) && ModelosMapper.estaDisponible(f, ahora))
+                    .sorted(Comparator.comparing(FranjaDTO::inicio))
+                    .map(f -> ModelosMapper.aVista(f, ahora))
+                    .toList();
+        });
+    }
+
+    private static String detalle(String estado, boolean esCliente, String otro) {
+        return switch (estado) {
+            case "PENDIENTE" -> esCliente ? "Esperando que " + otro + " acepte tu solicitud."
+                    : otro + " te pidió esta mentoría. Al aceptarla se reserva el lugar en la franja.";
+            case "ACEPTADA" -> esCliente ? otro + " aceptó. Pagá para confirmar la sesión."
+                    : "Aceptaste. Esperando el pago de " + otro + ".";
+            case "CONFIRMADA" -> esCliente ? "Pago confirmado. Esperando que " + otro + " inicie la sesión."
+                    : otro + " ya pagó. Iniciá la sesión a la hora de la franja.";
+            case "EN_CURSO" -> esCliente ? "La sesión está en curso." : "La sesión está en curso. Completala al terminar.";
+            case "COMPLETADA" -> "Sesión completada. Podés calificar a " + otro + ".";
+            case "RECHAZADA" -> esCliente ? otro + " rechazó la solicitud." : "Rechazaste la solicitud.";
+            case "CANCELADA" -> "La contratación se canceló.";
+            default -> "";
+        };
     }
 
     private static String sinPasoSiguiente(String estado) {

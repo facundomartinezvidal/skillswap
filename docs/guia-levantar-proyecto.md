@@ -94,6 +94,7 @@ Usuarios de demo: `user-mateo`, `user-ana`, `user-sofia`, `user-tomas`, `user-ca
 ### Desde la consola (con Maven instalado)
 
 ```bash
+./correr.sh                                              # opción A en un comando: Docker + compilar + abrir
 mvn compile exec:java                                    # opción A (Docker)
 mvn compile exec:java -Dexec.args="--memoria"            # opción C
 mvn compile exec:java -Dexec.args="--usuario user-ana"   # otro usuario
