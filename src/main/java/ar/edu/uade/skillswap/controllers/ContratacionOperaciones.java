@@ -13,6 +13,12 @@ public interface ContratacionOperaciones {
     /** Las contrataciones como cliente o proveedor, de la más nueva a la más vieja. */
     PaginaVista<Contratacion> listarContrataciones(String userId, int pagina, int tamanio);
 
+    /**
+     * La solicitud completa que pide la consigna: el cliente elige la franja e indica mensaje y objetivo.
+     * El dominio rechaza una franja que ya empezó, sin cupo o de otra publicación.
+     */
+    Contratacion solicitar(String userId, String publicacionId, String franjaId, String mensaje, String objetivo);
+
     Contratacion aceptar(String userId, String contratacionId);
 
     Contratacion rechazar(String userId, String contratacionId, String motivo);
@@ -33,6 +39,12 @@ public interface ContratacionOperaciones {
 
     /** El historial de estados en texto, del primero al último: fecha, cambio, quién y motivo. */
     List<String> verHistorial(String userId, String contratacionId);
+
+    /**
+     * Qué le toca a quien mira la contratación: su rol, el texto del botón que hace lo mismo que
+     * {@code avanzar} (o null si no le toca nada) y una explicación del estado.
+     */
+    PasoSiguienteVista pasoSiguiente(String userId, String contratacionId);
 
     /** Si quien mira la contratación es el cliente (el único que puede volver a solicitar). */
     boolean esCliente(String userId, String contratacionId);

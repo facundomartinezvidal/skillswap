@@ -3,8 +3,10 @@ package ar.edu.uade.skillswap.controllers.impl;
 import ar.edu.uade.skillswap.application.contratacion.dto.ContratacionDTO;
 import ar.edu.uade.skillswap.application.notificacion.dto.NotificacionDTO;
 import ar.edu.uade.skillswap.application.perfil.dto.PerfilDTO;
+import ar.edu.uade.skillswap.application.publicacion.dto.FranjaDTO;
 import ar.edu.uade.skillswap.application.publicacion.dto.PublicacionDTO;
 import ar.edu.uade.skillswap.application.wallet.dto.MovimientoDTO;
+import ar.edu.uade.skillswap.controllers.FranjaVista;
 import ar.edu.uade.skillswap.controllers.PaginaVista;
 import ar.edu.uade.skillswap.domain.perfil.TipoPerfil;
 import ar.edu.uade.skillswap.domain.shared.Pagina;
@@ -75,6 +77,16 @@ final class ModelosMapper {
 
     static ar.edu.uade.skillswap.domain.publicacion.Modalidad aDominio(Models.Modalidad modalidad) {
         return modalidad == null ? null : ar.edu.uade.skillswap.domain.publicacion.Modalidad.valueOf(modalidad.name());
+    }
+
+    /** Una franja se puede solicitar si todavía no empezó y le queda lugar. */
+    static boolean estaDisponible(FranjaDTO franja, Instant ahora) {
+        return franja.lugaresLibres() > 0 && franja.inicio().isAfter(ahora);
+    }
+
+    static FranjaVista aVista(FranjaDTO franja, Instant ahora) {
+        return new FranjaVista(franja.id(), aFecha(franja.inicio()), aFecha(franja.fin()), franja.lugaresLibres(),
+                estaDisponible(franja, ahora));
     }
 
     static LocalDateTime aFecha(Instant instante) {

@@ -2,6 +2,9 @@ package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.controllers.CalificacionController;
 import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
+import ar.edu.uade.skillswap.controllers.FranjaVista;
+import ar.edu.uade.skillswap.controllers.PasoSiguienteVista;
+import ar.edu.uade.skillswap.controllers.PublicacionOperaciones;
 
 import ar.edu.uade.skillswap.model.Models;
 
@@ -11,7 +14,13 @@ import ar.edu.uade.skillswap.model.Models.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -24,6 +33,7 @@ public final class SkillSwapView extends JPanel {
     private final Models.Perfil perfilActivo;
     private final CalificacionController calificaciones;
     private final ContratacionOperaciones operaciones;
+    private final PublicacionOperaciones publicacionOperaciones;
     private final List<String> usuarios;
     private final Consumer<String> cambiarUsuario;
     private JButton coins;
@@ -42,11 +52,12 @@ public final class SkillSwapView extends JPanel {
 
     /**
      * Las operaciones del equipo llegan aparte porque {@link UiControllers} es de la cátedra. Pueden ser null:
-     * en ese caso no se muestran los botones Calificar, Ver historial ni Volver a solicitar.
+     * en ese caso no se muestran los botones Calificar, Ver historial ni Volver a solicitar, y Solicitar mentoría
+     * no pide franja, mensaje ni objetivo.
      */
     public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
                          ContratacionOperaciones operaciones) {
-        this(controllers, userId, calificaciones, operaciones, List.of(), null);
+        this(controllers, userId, calificaciones, operaciones, null, List.of(), null);
     }
 
     /**
@@ -54,8 +65,10 @@ public final class SkillSwapView extends JPanel {
      * {@code usuarios} y le pasa el elegido a quien armó la vista (main), que la vuelve a crear con ese userId.
      */
     public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
-                         ContratacionOperaciones operaciones, List<String> usuarios, Consumer<String> cambiarUsuario) {
+                         ContratacionOperaciones operaciones, PublicacionOperaciones publicacionOperaciones,
+                         List<String> usuarios, Consumer<String> cambiarUsuario) {
         this.controllers=controllers;
+        this.publicacionOperaciones=publicacionOperaciones;
         this.usuarios=List.copyOf(usuarios);
         this.cambiarUsuario=cambiarUsuario;
         this.calificaciones=calificaciones;
@@ -116,13 +129,13 @@ public final class SkillSwapView extends JPanel {
     private JPanel cardGrid(List<Publicacion> list){JPanel grid=new JPanel(new GridLayout(0,3,14,14));grid.setOpaque(false);grid.setAlignmentX(LEFT_ALIGNMENT);for(Publicacion x:list)grid.add(listingCard(x));return grid;}
     private JComponent listingCard(Publicacion x){JPanel c=card(new BorderLayout(0,12));JPanel top=new JPanel(new BorderLayout());top.setOpaque(false);top.add(pill(x.categoria(),TEAL),BorderLayout.WEST);top.add(label("★ "+x.reputacion(),H3,GOLD),BorderLayout.EAST);c.add(top,BorderLayout.NORTH);JPanel mid=new JPanel();mid.setOpaque(false);mid.setLayout(new BoxLayout(mid,BoxLayout.Y_AXIS));JLabel t=label("<html><div style='width:210px'>"+x.titulo()+"</div></html>",H3,TEXT);mid.add(t);mid.add(Box.createVerticalStrut(7));mid.add(label("Por "+x.proveedor(),SMALL,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label("<html><div style='width:215px;color:#677480'>"+x.descripcion()+"</div></html>",BODY,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label(x.modalidad()+"  ·  "+x.duracionMinutos()+" min",SMALL,MUTED));c.add(mid);JPanel bottom=new JPanel(new BorderLayout());bottom.setOpaque(false);bottom.add(label(x.precio()+" ◈",new Font("SansSerif",Font.BOLD,20),NAVY),BorderLayout.WEST);JButton detail=button("Ver detalle",true);detail.addActionListener(e->showDetail(x));bottom.add(detail,BorderLayout.EAST);c.add(bottom,BorderLayout.SOUTH);return c;}
 
-    private void showDetail(Publicacion x){JPanel p=base();JButton back=button("← Volver a explorar",false);back.setAlignmentX(LEFT_ALIGNMENT);back.addActionListener(e->showExplore());p.add(back);p.add(Box.createVerticalStrut(18));JPanel c=card(new BorderLayout(28,0));c.setMaximumSize(new Dimension(Integer.MAX_VALUE,390));JPanel info=new JPanel();info.setOpaque(false);info.setLayout(new BoxLayout(info,BoxLayout.Y_AXIS));info.add(pill(x.categoria(),TEAL));info.add(Box.createVerticalStrut(14));info.add(label("<html><div style='width:540px'>"+x.titulo()+"</div></html>",H1,TEXT));info.add(Box.createVerticalStrut(10));info.add(label("★ "+x.reputacion()+"  ·  "+x.proveedor()+"  ·  "+x.modalidad(),H3,MUTED));info.add(Box.createVerticalStrut(22));info.add(label("Sobre esta propuesta",H2,TEXT));info.add(Box.createVerticalStrut(8));info.add(label("<html><div style='width:550px'>"+x.descripcion()+"</div></html>",BODY,MUTED));info.add(Box.createVerticalStrut(16));info.add(label("Duración: "+x.duracionMinutos()+" minutos",BODY,TEXT));c.add(info);JPanel buy=new Theme.RoundedPanel(16,new Color(239,247,246));buy.setLayout(new BoxLayout(buy,BoxLayout.Y_AXIS));buy.setBorder(new EmptyBorder(22,22,22,22));buy.add(label("INVERSIÓN",SMALL,MUTED));buy.add(label(x.precio()+" SkillCoins",new Font("SansSerif",Font.BOLD,25),NAVY));buy.add(Box.createVerticalStrut(12));buy.add(label("Saldo disponible: "+controllers.wallet().consultarSaldo(USER_ID),SMALL,MUTED));buy.add(Box.createVerticalStrut(20));JButton req=button("Solicitar mentoría",true);req.addActionListener(e->intentar(()->{controllers.contrataciones().solicitar(USER_ID,x.id(),"Quiero profundizar y practicar");message("¡Solicitud enviada!", "Podés seguir su estado desde Contrataciones.");showContracts();}));buy.add(req);c.add(buy,BorderLayout.EAST);c.setAlignmentX(LEFT_ALIGNMENT);p.add(c);page("Detalle",p);}
+    private void showDetail(Publicacion x){JPanel p=base();JButton back=button("← Volver a explorar",false);back.setAlignmentX(LEFT_ALIGNMENT);back.addActionListener(e->showExplore());p.add(back);p.add(Box.createVerticalStrut(18));JPanel c=card(new BorderLayout(28,0));c.setMaximumSize(new Dimension(Integer.MAX_VALUE,390));JPanel info=new JPanel();info.setOpaque(false);info.setLayout(new BoxLayout(info,BoxLayout.Y_AXIS));info.add(pill(x.categoria(),TEAL));info.add(Box.createVerticalStrut(14));info.add(label("<html><div style='width:540px'>"+x.titulo()+"</div></html>",H1,TEXT));info.add(Box.createVerticalStrut(10));info.add(label("★ "+x.reputacion()+"  ·  "+x.proveedor()+"  ·  "+x.modalidad(),H3,MUTED));info.add(Box.createVerticalStrut(22));info.add(label("Sobre esta propuesta",H2,TEXT));info.add(Box.createVerticalStrut(8));info.add(label("<html><div style='width:550px'>"+x.descripcion()+"</div></html>",BODY,MUTED));info.add(Box.createVerticalStrut(16));info.add(label("Duración: "+x.duracionMinutos()+" minutos",BODY,TEXT));c.add(info);JPanel buy=new Theme.RoundedPanel(16,new Color(239,247,246));buy.setLayout(new BoxLayout(buy,BoxLayout.Y_AXIS));buy.setBorder(new EmptyBorder(22,22,22,22));buy.add(label("INVERSIÓN",SMALL,MUTED));buy.add(label(x.precio()+" SkillCoins",new Font("SansSerif",Font.BOLD,25),NAVY));buy.add(Box.createVerticalStrut(12));buy.add(label("Saldo disponible: "+controllers.wallet().consultarSaldo(USER_ID),SMALL,MUTED));buy.add(Box.createVerticalStrut(20));JButton req=button("Solicitar mentoría",true);req.addActionListener(e->solicitar(x));buy.add(req);c.add(buy,BorderLayout.EAST);c.setAlignmentX(LEFT_ALIGNMENT);p.add(c);page("Detalle",p);}
 
-    private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(e->createListing());title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.titulo(),H3,TEXT),BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.WEST);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(e->intentar(()->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));row.add(toggle,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
+    private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(e->createListing());title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.titulo(),H3,TEXT),BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.WEST);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(e->intentar(()->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));JPanel acciones=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));acciones.setOpaque(false);if(publicacionOperaciones!=null&&x.estado()==EstadoPublicacion.BORRADOR){JButton franjas=button("Franjas",false);franjas.addActionListener(e->editarFranjas(x));acciones.add(franjas);}acciones.add(toggle);row.add(acciones,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
 
-    private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);JSpinner precio=campoPrecio();form.add(new JLabel("Precio (SkillCoins)"));form.add(precio);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){intentar(()->{controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,(Integer)precio.getValue());message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();});}}
+    private void createListing(){JTextField title=new JTextField(26);JTextArea desc=new JTextArea(4,26);desc.setLineWrap(true);desc.setWrapStyleWord(true);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JPanel form=formulario();campo(form,"Título",title);campo(form,"Descripción",new JScrollPane(desc));campo(form,"Categoría",cat);JSpinner precio=campoPrecio();campo(form,"Precio (SkillCoins)",precio);JSpinner duracion=new JSpinner(new SpinnerNumberModel(60,15,480,15));JSpinner cupo=new JSpinner(new SpinnerNumberModel(1,1,50,1));DefaultListModel<LocalDateTime> franjas=new DefaultListModel<>();franjas.addElement(manianaEnPunto());if(publicacionOperaciones!=null){campo(form,"Duración (minutos)",duracion);campo(form,"Lugares por franja",cupo);campo(form,"Franjas",editorDeFranjas(franjas,duracion));}if(confirmarSinSuperposiciones(form,"Nueva publicación",franjas,duracion)&&!title.getText().isBlank()){intentar(()->{if(publicacionOperaciones!=null)publicacionOperaciones.crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,(Integer)duracion.getValue(),(Integer)precio.getValue(),(Integer)cupo.getValue(),java.util.Collections.list(franjas.elements()));else controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,(Integer)precio.getValue());message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();});}}
 
-    private void showContracts(){JPanel p=base();addSection(p,"Tus contrataciones","Avanzá el flujo para probar los estados del sistema");for(Contratacion x:controllers.contrataciones().listarContrataciones(USER_ID)){JPanel row=card(new BorderLayout(16,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,105));JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(x.titulo(),H3,TEXT));txt.add(Box.createVerticalStrut(5));txt.add(label(x.contraparte()+"  ·  "+x.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")),BODY,MUTED));row.add(txt,BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoContratacion.COMPLETADA?TEAL:NAVY_2),BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));actions.setOpaque(false);if(x.estado()==EstadoContratacion.COMPLETADA&&calificaciones!=null){JButton rate=button("Calificar",true);rate.addActionListener(e->calificar(x));actions.add(rate);}boolean terminada=x.estado()==EstadoContratacion.RECHAZADA||x.estado()==EstadoContratacion.CANCELADA;if(terminada&&operaciones!=null){JButton hist=button("Ver historial",false);hist.addActionListener(e->intentar(()->verHistorial(x)));actions.add(hist);}if(x.estado()==EstadoContratacion.RECHAZADA&&operaciones!=null&&operaciones.esCliente(USER_ID,x.id())){JButton again=button("Volver a solicitar",true);again.addActionListener(e->intentar(()->{operaciones.volverASolicitar(USER_ID,x.id());message("¡Solicitud enviada!","Se creó una solicitud nueva para la misma publicación.");showContracts();}));actions.add(again);}if(x.estado()!=EstadoContratacion.COMPLETADA&&!terminada){JButton next=button("Avanzar estado",true);next.addActionListener(e->intentar(()->{controllers.contrataciones().avanzar(USER_ID,x.id());showContracts();}));actions.add(next);JButton cancel=button("Cancelar",false);cancel.addActionListener(e->intentar(()->{controllers.contrataciones().cancelar(USER_ID,x.id());showContracts();}));actions.add(cancel);}row.add(actions,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(11));}page("Contrataciones",p);}
+    private void showContracts(){JPanel p=base();addSection(p,"Tus contrataciones","Avanzá el flujo para probar los estados del sistema");for(Contratacion x:controllers.contrataciones().listarContrataciones(USER_ID)){PasoSiguienteVista paso=operaciones==null?null:operaciones.pasoSiguiente(USER_ID,x.id());JPanel row=card(new BorderLayout(16,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,paso==null?105:125));JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(x.titulo(),H3,TEXT));txt.add(Box.createVerticalStrut(5));txt.add(label(x.contraparte()+"  ·  "+x.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm"))+(paso==null?"":"  ·  "+x.precio()+" SkillCoins  ·  Sos "+paso.rol().toLowerCase()),BODY,MUTED));if(paso!=null&&!paso.detalle().isBlank()){txt.add(Box.createVerticalStrut(4));txt.add(label(paso.detalle(),SMALL,TEXT));}row.add(txt,BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoContratacion.COMPLETADA?TEAL:NAVY_2),BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));actions.setOpaque(false);if(x.estado()==EstadoContratacion.COMPLETADA&&calificaciones!=null){JButton rate=button("Calificar",true);rate.addActionListener(e->calificar(x));actions.add(rate);}boolean terminada=x.estado()==EstadoContratacion.RECHAZADA||x.estado()==EstadoContratacion.CANCELADA;if(terminada&&operaciones!=null){JButton hist=button("Ver historial",false);hist.addActionListener(e->intentar(()->verHistorial(x)));actions.add(hist);}if(x.estado()==EstadoContratacion.RECHAZADA&&operaciones!=null&&operaciones.esCliente(USER_ID,x.id())){JButton again=button("Volver a solicitar",true);again.addActionListener(e->intentar(()->{operaciones.volverASolicitar(USER_ID,x.id());message("¡Solicitud enviada!","Se creó una solicitud nueva para la misma publicación.");showContracts();}));actions.add(again);}if(x.estado()!=EstadoContratacion.COMPLETADA&&!terminada){if(paso==null||paso.accion()!=null){JButton next=button(paso==null?"Avanzar estado":paso.accion(),true);next.addActionListener(e->intentar(()->{controllers.contrataciones().avanzar(USER_ID,x.id());showContracts();}));actions.add(next);}JButton cancel=button("Cancelar",false);cancel.addActionListener(e->intentar(()->{controllers.contrataciones().cancelar(USER_ID,x.id());showContracts();}));actions.add(cancel);}row.add(actions,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(11));}page("Contrataciones",p);}
 
     private void showWallet(){JPanel p=base();JPanel balance=new Theme.RoundedPanel(22,NAVY_2);balance.setLayout(new BorderLayout());balance.setBorder(new EmptyBorder(24,26,24,26));balance.setMaximumSize(new Dimension(Integer.MAX_VALUE,120));JPanel btxt=new JPanel();btxt.setOpaque(false);btxt.setLayout(new BoxLayout(btxt,BoxLayout.Y_AXIS));btxt.add(label("SALDO DISPONIBLE",SMALL,new Color(184,209,222)));btxt.add(label(controllers.wallet().consultarSaldo(USER_ID)+" SkillCoins",new Font("SansSerif",Font.BOLD,30),Color.WHITE));balance.add(btxt);JButton add=button("+ Acreditar demo",true);add.addActionListener(e->intentar(()->{controllers.wallet().acreditarDemo(USER_ID,500);showWallet();}));balance.add(add,BorderLayout.EAST);balance.setAlignmentX(LEFT_ALIGNMENT);p.add(balance);p.add(Box.createVerticalStrut(24));addSection(p,"Movimientos recientes",null);for(Movimiento m:controllers.wallet().listarMovimientos(USER_ID)){JPanel row=card(new BorderLayout());row.setMaximumSize(new Dimension(Integer.MAX_VALUE,72));JPanel t=new JPanel();t.setOpaque(false);t.setLayout(new BoxLayout(t,BoxLayout.Y_AXIS));t.add(label(m.concepto(),H3,TEXT));t.add(label(m.fecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm")),SMALL,MUTED));row.add(t);row.add(label((m.importe()>0?"+":"")+m.importe()+" ◈",H3,m.importe()>0?TEAL:DANGER),BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(8));}page("SkillCoins",p);}
 
@@ -153,6 +166,152 @@ public final class SkillSwapView extends JPanel {
     }
 
     /** Ejecuta una acción de un botón y, si el sistema la rechaza, muestra el motivo sobre la ventana. */
+    private static final DateTimeFormatter FORMATO_FRANJA=DateTimeFormatter.ofPattern("EEE dd/MM · HH:mm",Locale.forLanguageTag("es-AR"));
+    private static final DateTimeFormatter FORMATO_HORA=DateTimeFormatter.ofPattern("HH:mm");
+
+    /**
+     * La consigna pide que el cliente indique franja, mensaje y objetivo. Con las operaciones del equipo se
+     * ofrecen solo las franjas que todavía se pueden pedir; sin ellas, queda el solicitar de la cátedra, que
+     * elige la primera franja libre.
+     */
+    private void solicitar(Publicacion x){
+        if(operaciones==null||publicacionOperaciones==null){
+            intentar(()->{controllers.contrataciones().solicitar(USER_ID,x.id(),"Quiero profundizar y practicar");solicitudEnviada();});
+            return;
+        }
+        intentar(()->elegirFranjaYSolicitar(x));
+    }
+
+    private void elegirFranjaYSolicitar(Publicacion x){
+        List<FranjaVista> franjas=publicacionOperaciones.listarFranjas(USER_ID,x.id()).stream().filter(FranjaVista::disponible).toList();
+        if(franjas.isEmpty()){message("Sin franjas disponibles","Esta publicación no tiene franjas con lugar. Probá más adelante.");return;}
+        JComboBox<String> franja=new JComboBox<>(franjas.stream().map(this::textoFranja).toArray(String[]::new));
+        JTextField objetivo=new JTextField();JTextArea mensaje=new JTextArea(3,26);mensaje.setLineWrap(true);mensaje.setWrapStyleWord(true);
+        objetivo.setColumns(26);
+        JPanel form=formulario();
+        campo(form,"Franja horaria",franja);
+        campo(form,"Objetivo",objetivo);
+        campo(form,"Mensaje (opcional)",new JScrollPane(mensaje));
+        if(JOptionPane.showConfirmDialog(this,form,"Solicitar: "+x.titulo(),JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
+        String franjaId=franjas.get(franja.getSelectedIndex()).id();
+        operaciones.solicitar(USER_ID,x.id(),franjaId,mensaje.getText(),objetivo.getText());solicitudEnviada();
+    }
+
+    private String textoFranja(FranjaVista f){
+        return textoHorario(f)+"  ·  "+f.lugaresLibres()+(f.lugaresLibres()==1?" lugar":" lugares");
+    }
+
+    private static String textoHorario(FranjaVista f){return FORMATO_FRANJA.format(f.inicio())+"–"+FORMATO_HORA.format(f.fin());}
+
+    /**
+     * Las franjas las define el autor mientras la publicación está en borrador: muestra las cargadas y agrega
+     * una nueva con la duración de la sesión. Superposiciones y demás reglas las valida el dominio.
+     */
+    private void editarFranjas(Publicacion x){
+        intentar(()->{
+            List<FranjaVista> franjas=publicacionOperaciones.listarFranjas(USER_ID,x.id());
+            JPanel form=formulario();
+            if(franjas.isEmpty())campo(form,"Cargadas",new JLabel("Todavía no cargaste franjas"));
+            for(int i=0;i<franjas.size();i++)campo(form,i==0?"Cargadas":"",new JLabel(textoHorario(franjas.get(i))));
+            LocalDateTime sugerida=franjas.isEmpty()?manianaEnPunto():franjas.get(franjas.size()-1).inicio().plusDays(1);
+            JSpinner inicio=campoFechaHora(sugerida);
+            campo(form,"Nueva franja",inicio);
+            campo(form,"",new JLabel("Dura "+x.duracionMinutos()+" minutos, como la sesión"));
+            if(JOptionPane.showConfirmDialog(this,form,"Franjas: "+x.titulo(),JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
+            LocalDateTime desde=fechaHora(inicio);
+            publicacionOperaciones.agregarFranja(USER_ID,x.id(),desde,desde.plusMinutes(x.duracionMinutos()));
+            message("Franja agregada",FORMATO_FRANJA.format(desde)+"–"+FORMATO_HORA.format(desde.plusMinutes(x.duracionMinutos())));
+            editarFranjas(x);
+        });
+    }
+
+    /** Formulario de dos columnas (etiqueta y campo) donde cada fila toma la altura que necesita. */
+    private static JPanel formulario(){JPanel form=new JPanel(new GridBagLayout());form.setBorder(new EmptyBorder(4,2,4,2));return form;}
+
+    private static void campo(JPanel form,String etiqueta,JComponent valor){
+        int fila=form.getComponentCount()/2;
+        form.add(new JLabel(etiqueta),new GridBagConstraints(0,fila,1,1,0,0,GridBagConstraints.NORTHWEST,GridBagConstraints.NONE,new Insets(7,0,5,14),0,0));
+        form.add(valor,new GridBagConstraints(1,fila,1,1,1,0,GridBagConstraints.WEST,GridBagConstraints.HORIZONTAL,new Insets(3,0,3,0),0,0));
+    }
+
+    /**
+     * Las franjas del formulario de creación: un campo de fecha y hora con "+ Agregar", y la lista de las
+     * agregadas con "Quitar". La siguiente se sugiere un día después de la última. Cada franja dura lo que
+     * diga {@code duracion}; las reglas (como no superponerse) las valida el dominio al crear.
+     */
+    private JComponent editorDeFranjas(DefaultListModel<LocalDateTime> franjas,JSpinner duracion){
+        JList<LocalDateTime> lista=new JList<>(franjas);lista.setVisibleRowCount(3);
+        lista.setCellRenderer(new DefaultListCellRenderer(){
+            @Override public Component getListCellRendererComponent(JList<?> l,Object valor,int i,boolean sel,boolean foco){
+                LocalDateTime desde=(LocalDateTime)valor;
+                return super.getListCellRendererComponent(l,textoHorario(desde,(Integer)duracion.getValue()),i,sel,foco);
+            }
+        });
+        duracion.addChangeListener(e->lista.repaint());
+        JSpinner nueva=campoFechaHora(manianaEnPunto().plusDays(1));
+        JButton agregar=new JButton("+ Agregar");
+        agregar.addActionListener(e->{
+            LocalDateTime desde=fechaHora(nueva);int minutos=(Integer)duracion.getValue();
+            for(int i=0;i<franjas.size();i++){
+                if(seSuperponen(franjas.get(i),desde,minutos)){
+                    JOptionPane.showMessageDialog(SwingUtilities.getWindowAncestor(agregar),"Se superpone con la franja del "+textoHorario(franjas.get(i),minutos)+".","Franja superpuesta",JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+            }
+            int lugar=0;while(lugar<franjas.size()&&franjas.get(lugar).isBefore(desde))lugar++;
+            franjas.add(lugar,desde);
+            nueva.setValue(Date.from(desde.plusDays(1).atZone(ZoneId.systemDefault()).toInstant()));
+        });
+        JButton quitar=new JButton("Quitar");
+        quitar.addActionListener(e->{int i=lista.getSelectedIndex();if(i>=0)franjas.remove(i);});
+        JPanel alta=new JPanel(new BorderLayout(6,0));alta.setOpaque(false);alta.add(nueva);alta.add(agregar,BorderLayout.EAST);
+        JPanel cargadas=new JPanel(new BorderLayout(6,0));cargadas.setOpaque(false);cargadas.add(new JScrollPane(lista));
+        JPanel botonQuitar=new JPanel(new BorderLayout());botonQuitar.setOpaque(false);botonQuitar.add(quitar,BorderLayout.NORTH);cargadas.add(botonQuitar,BorderLayout.EAST);
+        quitar.setPreferredSize(agregar.getPreferredSize());
+        JPanel editor=new JPanel(new BorderLayout(0,6));editor.setOpaque(false);editor.add(cargadas);editor.add(alta,BorderLayout.SOUTH);
+        return editor;
+    }
+
+    /** Dos franjas de la misma duración se superponen si empiezan a menos de esa duración una de otra. */
+    private static boolean seSuperponen(LocalDateTime una,LocalDateTime otra,int minutos){
+        return Math.abs(java.time.Duration.between(una,otra).toMinutes())<minutos;
+    }
+
+    private static String textoHorario(LocalDateTime desde,int minutos){
+        return FORMATO_FRANJA.format(desde)+"–"+FORMATO_HORA.format(desde.plusMinutes(minutos));
+    }
+
+    /**
+     * Muestra el formulario hasta que se cancela o se confirma sin franjas superpuestas. Pueden quedar
+     * superpuestas si se alarga la duración después de agregarlas: en ese caso avisa y el formulario vuelve
+     * a abrirse con lo que ya estaba cargado.
+     */
+    private boolean confirmarSinSuperposiciones(JPanel form,String titulo,DefaultListModel<LocalDateTime> franjas,JSpinner duracion){
+        while(true){
+            if(JOptionPane.showConfirmDialog(this,form,titulo,JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return false;
+            int minutos=(Integer)duracion.getValue();String conflicto=null;
+            for(int i=1;i<franjas.size()&&conflicto==null;i++)
+                if(seSuperponen(franjas.get(i-1),franjas.get(i),minutos))
+                    conflicto=textoHorario(franjas.get(i-1),minutos)+" y "+textoHorario(franjas.get(i),minutos);
+            if(conflicto==null)return true;
+            JOptionPane.showMessageDialog(this,"Con "+minutos+" minutos de duración se superponen las franjas "+conflicto+". Quitá una o acortá la duración.","Franjas superpuestas",JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private static LocalDateTime manianaEnPunto(){return LocalDateTime.now().truncatedTo(ChronoUnit.HOURS).plusDays(1);}
+
+    private static JSpinner campoFechaHora(LocalDateTime inicial){
+        JSpinner campo=new JSpinner(new SpinnerDateModel(Date.from(inicial.atZone(ZoneId.systemDefault()).toInstant()),null,null,Calendar.MINUTE));
+        campo.setEditor(new JSpinner.DateEditor(campo,"dd/MM/yyyy HH:mm"));
+        return campo;
+    }
+
+    private static LocalDateTime fechaHora(JSpinner campo){
+        return LocalDateTime.ofInstant(((Date)campo.getValue()).toInstant(),ZoneId.systemDefault()).truncatedTo(ChronoUnit.MINUTES);
+    }
+
+    private void solicitudEnviada(){message("¡Solicitud enviada!", "Podés seguir su estado desde Contrataciones.");showContracts();}
+
     private void intentar(Runnable accion) {
         try {
             accion.run();

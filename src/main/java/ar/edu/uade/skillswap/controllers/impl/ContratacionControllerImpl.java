@@ -11,6 +11,7 @@ import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoExc
 import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
 import ar.edu.uade.skillswap.controllers.PaginaVista;
+import ar.edu.uade.skillswap.controllers.PasoSiguienteVista;
 import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.Contratacion;
@@ -76,12 +77,19 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
         });
     }
 
+    @Override
+    public Contratacion solicitar(String userId, String publicacionId, String franjaId, String mensaje,
+                                  String objetivo) {
+        return ejecutar(() -> aModelo(userId, contratacionService.solicitar(
+                new SolicitarContratacionCommand(userId, publicacionId, franjaId, mensaje, objetivo))));
+    }
+
     private String franjaParaSolicitar(String userId, String publicacionId) {
         var franjas = publicacionService.verPublicacion(userId, publicacionId).franjas().stream()
                 .sorted(Comparator.comparing(FranjaDTO::inicio))
                 .toList();
         return franjas.stream()
-                .filter(f -> f.lugaresLibres() > 0 && f.inicio().isAfter(clock.instant()))
+                .filter(f -> ModelosMapper.estaDisponible(f, clock.instant()))
                 .findFirst()
                 .or(() -> franjas.stream().findFirst())
                 .orElseThrow(() -> new OperacionRechazadaException("La publicación no tiene franjas disponibles"))
@@ -97,22 +105,67 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
     public Contratacion avanzar(String userId, String contratacionId) {
         return ejecutar(() -> {
             var actual = contratacionService.verContratacion(userId, contratacionId);
-            var esProveedor = actual.proveedorId().equals(userId);
-            var esCliente = actual.clienteId().equals(userId);
-            ContratacionDTO resultado;
-            if ("PENDIENTE".equals(actual.estado()) && esProveedor) {
-                resultado = contratacionService.aceptar(userId, contratacionId);
-            } else if ("ACEPTADA".equals(actual.estado()) && esCliente) {
-                resultado = contratacionService.pagar(userId, contratacionId);
-            } else if ("CONFIRMADA".equals(actual.estado()) && esProveedor) {
-                resultado = contratacionService.iniciar(userId, contratacionId);
-            } else if ("EN_CURSO".equals(actual.estado()) && esProveedor) {
-                resultado = contratacionService.completar(userId, contratacionId);
-            } else {
+            var paso = pasoDe(actual, userId);
+            if (paso == null) {
                 throw new OperacionRechazadaException(sinPasoSiguiente(actual.estado()));
             }
+            var resultado = switch (paso) {
+                case ACEPTAR -> contratacionService.aceptar(userId, contratacionId);
+                case PAGAR -> contratacionService.pagar(userId, contratacionId);
+                case INICIAR -> contratacionService.iniciar(userId, contratacionId);
+                case COMPLETAR -> contratacionService.completar(userId, contratacionId);
+            };
             return aModelo(userId, resultado);
         });
+    }
+
+    /** Lo que hace {@link #avanzar} según el estado y quién lo pide. */
+    private enum Paso { ACEPTAR, PAGAR, INICIAR, COMPLETAR }
+
+    /** El paso que le toca a {@code userId}, o null si no le toca ninguno. */
+    private static Paso pasoDe(ContratacionDTO c, String userId) {
+        var esProveedor = c.proveedorId().equals(userId);
+        var esCliente = c.clienteId().equals(userId);
+        return switch (c.estado()) {
+            case "PENDIENTE" -> esProveedor ? Paso.ACEPTAR : null;
+            case "ACEPTADA" -> esCliente ? Paso.PAGAR : null;
+            case "CONFIRMADA" -> esProveedor ? Paso.INICIAR : null;
+            case "EN_CURSO" -> esProveedor ? Paso.COMPLETAR : null;
+            default -> null;
+        };
+    }
+
+    @Override
+    public PasoSiguienteVista pasoSiguiente(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var c = contratacionService.verContratacion(userId, contratacionId);
+            var esCliente = c.clienteId().equals(userId);
+            var otro = nombreContraparte(userId, c, new HashMap<>());
+            var paso = pasoDe(c, userId);
+            var accion = paso == null ? null : switch (paso) {
+                case ACEPTAR -> "Aceptar";
+                case PAGAR -> "Pagar " + c.precioAcordado() + " SkillCoins";
+                case INICIAR -> "Iniciar sesión";
+                case COMPLETAR -> "Completar sesión";
+            };
+            return new PasoSiguienteVista(esCliente ? "Cliente" : "Proveedor", accion, detalle(c.estado(), esCliente, otro));
+        });
+    }
+
+    private static String detalle(String estado, boolean esCliente, String otro) {
+        return switch (estado) {
+            case "PENDIENTE" -> esCliente ? "Esperando que " + otro + " acepte tu solicitud."
+                    : otro + " te pidió esta mentoría. Al aceptarla se reserva el lugar en la franja.";
+            case "ACEPTADA" -> esCliente ? otro + " aceptó. Pagá para confirmar la sesión."
+                    : "Aceptaste. Esperando el pago de " + otro + ".";
+            case "CONFIRMADA" -> esCliente ? "Pago confirmado. Esperando que " + otro + " inicie la sesión."
+                    : otro + " ya pagó. Iniciá la sesión a la hora de la franja.";
+            case "EN_CURSO" -> esCliente ? "La sesión está en curso." : "La sesión está en curso. Completala al terminar.";
+            case "COMPLETADA" -> "Sesión completada. Podés calificar a " + otro + ".";
+            case "RECHAZADA" -> esCliente ? otro + " rechazó la solicitud." : "Rechazaste la solicitud.";
+            case "CANCELADA" -> "La contratación se canceló.";
+            default -> "";
+        };
     }
 
     private static String sinPasoSiguiente(String estado) {
