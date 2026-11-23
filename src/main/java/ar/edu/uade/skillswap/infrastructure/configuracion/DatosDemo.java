@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -43,6 +44,10 @@ public class DatosDemo {
     public static final String NICOLAS = "user-nicolas";
     public static final String LAURA = "user-laura";
     public static final String MARTIN = "user-martin";
+
+    /** Los usuarios con perfil en la demo, en el orden en que los ofrece el selector de la UI. */
+    public static final List<String> USUARIOS = List.of(MATEO, ANA, LUCIA, SOFIA, TOMAS, CAMILA, NICOLAS, LAURA,
+            MARTIN);
 
     /** Saldo extra que Mateo carga en la demo, además del bono de bienvenida. */
     static final long CARGA_MATEO = 1500;

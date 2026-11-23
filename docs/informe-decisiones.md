@@ -254,7 +254,7 @@ Los diez casos también se recorren de punta a punta a través de los controller
 
 ## 9. Pruebas y cobertura
 
-- `mvn test` con Java 17: **579 tests, 0 fallos**. Los 26 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y se omiten si Docker no está disponible; en CI se ejecutan.
+- `mvn test` con Java 17: **580 tests, 0 fallos**. Los 26 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y se omiten si Docker no está disponible; en CI se ejecutan.
 - Cobertura medida con JaCoCo (`target/site/jacoco/index.html`), sin excluir clases:
 
 | Capa | Líneas | Ramas |

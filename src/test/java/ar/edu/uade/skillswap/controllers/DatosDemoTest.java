@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.controllers;
 
 import ar.edu.uade.skillswap.controllers.impl.SkillSwapControllers;
+import ar.edu.uade.skillswap.infrastructure.configuracion.DatosDemo;
 import ar.edu.uade.skillswap.model.Models.Contratacion;
 import ar.edu.uade.skillswap.model.Models.EstadoContratacion;
 import ar.edu.uade.skillswap.model.Models.EstadoPublicacion;
@@ -38,6 +39,14 @@ class DatosDemoTest {
         assertEquals(publicaciones, c.busqueda().buscar(TODO).size());
         assertEquals(contrataciones, c.contrataciones().listarContrataciones(MATEO).size());
         assertEquals(saldo, demo.saldo(MATEO));
+    }
+
+    @Test
+    void todosLosUsuariosDelSelectorTienenPerfil() {
+        for (var userId : DatosDemo.USUARIOS) {
+            assertEquals(userId, c.perfiles().verPerfil(userId).id());
+        }
+        assertEquals(MATEO, DatosDemo.USUARIOS.get(0));
     }
 
     @Test

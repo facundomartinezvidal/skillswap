@@ -76,4 +76,6 @@ MySQL en `BackendJpaTest`, que necesita Docker.
   y `docker compose up -d`; con un MySQL instalado, `DROP DATABASE skillswap;` y
   `CREATE DATABASE skillswap;`. La app vuelve a cargar la demo al arrancar.
 - El recorrido completo con dos usuarios (publicar → solicitar → aceptar → pagar → completar →
-  calificar) se hace abriendo la app con `--usuario user-mateo` y `--usuario user-sofia`.
+  calificar) se hace en la misma ventana, pasando de Mateo a Sofía con **⇄ Cambiar usuario** en la
+  barra lateral. Como el backend es el mismo, funciona también con `--memoria`. Para abrir directamente
+  con otro usuario sigue estando `--usuario user-sofia`.

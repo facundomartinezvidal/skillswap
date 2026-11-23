@@ -31,7 +31,8 @@ import java.util.List;
  * de la cátedra.
  * <ul>
  *   <li>{@code --memoria}: backend en memoria (plan B de la demo, sin MySQL).</li>
- *   <li>{@code --usuario <userId>}: login simulado; usuario activo (por defecto {@code user-mateo}).</li>
+ *   <li>{@code --usuario <userId>}: login simulado; usuario activo al abrir (por defecto {@code user-mateo}).
+ *   Después se cambia desde el botón Cambiar usuario de la barra lateral.</li>
  *   <li>{@code --screenshot <archivo>}: guarda la pantalla de inicio en un PNG y termina.</li>
  * </ul>
  */
@@ -58,8 +59,18 @@ public final class SkillSwapApplication {
             JFrame frame=new JFrame("SkillSwap");
             frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             frame.setMinimumSize(new Dimension(1120,700));frame.setSize(1365,820);frame.setLocationRelativeTo(null);
-            frame.setContentPane(new SkillSwapView(controllers, usuario, controllers.calificaciones(), controllers.contrataciones()));frame.setVisible(true);
+            mostrarVista(frame, controllers, usuario);frame.setVisible(true);
         });
+    }
+
+    /**
+     * Pone en la ventana la vista del usuario. El botón Cambiar usuario vuelve a llamar a este método con el
+     * elegido: la ventana y el backend son los mismos, así que en {@code --memoria} también se ven los datos.
+     */
+    private static void mostrarVista(JFrame frame, SkillSwapControllers controllers, String usuario) {
+        frame.setContentPane(new SkillSwapView(controllers, usuario, controllers.calificaciones(),
+                controllers.contrataciones(), DatosDemo.USUARIOS, elegido -> mostrarVista(frame, controllers, elegido)));
+        frame.revalidate();frame.repaint();
     }
 
     /** {@code --memoria} usa el backend en memoria; sin argumento, el de JPA con MySQL. */

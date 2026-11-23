@@ -46,7 +46,7 @@ En `COMPLETADA` la consigna menciona "consultar comprobante". `ContratacionDTO` 
 
 ### 8. Tests de MySQL
 
-Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no anda, se omiten. En el CI de GitHub corren. Antes de la defensa conviene correr `mvn test` en una máquina con Docker funcionando y confirmar que pasan los 579.
+Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no anda, se omiten. En el CI de GitHub corren. Antes de la defensa conviene correr `mvn test` en una máquina con Docker funcionando y confirmar que pasan los 580.
 
 ## Estado al 20/11 (entrega: martes 24/11)
 
