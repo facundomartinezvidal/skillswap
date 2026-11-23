@@ -72,7 +72,7 @@ public final class SkillSwapView extends JPanel {
         side.add(nav("⌂  Inicio",this::showHome)); side.add(nav("⌕  Explorar",this::showExplore)); side.add(nav("▣  Mis publicaciones",this::showListings)); side.add(nav("✓  Contrataciones",this::showContracts)); side.add(nav("◈  SkillCoins",this::showWallet)); side.add(nav("●  Notificaciones",this::showNotifications)); side.add(nav("♙  Mi perfil",this::showProfile)); side.add(Box.createVerticalGlue());
         if(cambiarUsuario!=null&&!usuarios.isEmpty()) side.add(nav("⇄  Cambiar usuario",this::elegirUsuario));
         JPanel user=new JPanel(new BorderLayout(10,0)); user.setOpaque(false); user.setBorder(new EmptyBorder(8,6,4,4)); user.setMaximumSize(new Dimension(Integer.MAX_VALUE,56)); user.setAlignmentX(LEFT_ALIGNMENT);
-        JLabel avatar=avatar(iniciales(),36); user.add(avatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(perfilActivo.nombre(),H3,Color.WHITE));txt.add(label(esProveedor(USER_ID)?"Profesional":"Cliente",SMALL,new Color(177,200,216)));user.add(txt);side.add(user); return side;
+        JLabel avatar=avatar(iniciales(),36); user.add(avatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(perfilActivo.nombre(),H3,Color.WHITE));txt.add(label(perfilActivo.rol(),SMALL,new Color(177,200,216)));user.add(txt);side.add(user); return side;
     }
 
     /**
@@ -91,12 +91,6 @@ public final class SkillSwapView extends JPanel {
         String elegido=usuarios.get(combo.getSelectedIndex());
         if(!elegido.equals(USER_ID))cambiarUsuario.accept(elegido);
     }
-
-    /**
-     * Todos los perfiles de la demo son PROFESIONAL (el tipo del dominio), así que el rol que se muestra sale de
-     * si el usuario ofrece publicaciones (profesional) o solo contrata (cliente).
-     */
-    private boolean esProveedor(String userId){return !controllers.publicaciones().listarPropias(userId).isEmpty();}
 
     private String rolEnLaDemo(String userId){
         int propias=controllers.publicaciones().listarPropias(userId).size();
