@@ -323,7 +323,7 @@ Perfil --> TipoPerfil
 Perfil --> CanalNotificacion
 
 ' Publicación
-Publicacion "1" *-- "1..*" FranjaDisponibilidad : franjas
+Publicacion "1" *-- "0..*" FranjaDisponibilidad : franjas (≥1 para publicar)
 Publicacion "1" o-- "0..*" Promocion : promociones
 Publicacion "1" --> "1" EstadoPublicacion : estado
 Publicacion --> TipoPublicacion
