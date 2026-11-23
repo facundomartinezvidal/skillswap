@@ -21,7 +21,15 @@ si una transcripción contradice el PDF oficial, prevalece el PDF.
 ### Con MySQL (opción por defecto)
 
 ```bash
-docker compose up -d
+./correr.sh                       # levanta MySQL con Docker, compila y abre la app
+./correr.sh --usuario user-ana    # cualquier argumento se le pasa a la app
+./correr.sh --reset               # borra la base para volver a la demo original
+```
+
+`correr.sh` hace lo mismo que estos dos comandos (en Windows, sin Git Bash o WSL, usar estos):
+
+```bash
+docker compose up -d --wait
 mvn compile exec:java
 ```
 
@@ -67,7 +75,7 @@ mvn test
 mvn verify
 ```
 
-- `mvn test` corre los 580 tests y deja el reporte de cobertura de JaCoCo en
+- `mvn test` corre los 606 tests y deja el reporte de cobertura de JaCoCo en
   `target/site/jacoco/index.html`.
 - Los 26 tests de `infrastructure/persistencia` usan Testcontainers: levantan un MySQL
   en Docker, migran con Flyway y prueban los repositorios, la búsqueda, las restricciones
