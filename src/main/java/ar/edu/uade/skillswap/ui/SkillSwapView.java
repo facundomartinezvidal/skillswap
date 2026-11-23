@@ -13,6 +13,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static ar.edu.uade.skillswap.ui.Theme.*;
 
@@ -23,6 +24,8 @@ public final class SkillSwapView extends JPanel {
     private final Models.Perfil perfilActivo;
     private final CalificacionController calificaciones;
     private final ContratacionOperaciones operaciones;
+    private final List<String> usuarios;
+    private final Consumer<String> cambiarUsuario;
     private JButton coins;
     private final UiControllers controllers;
     private final JPanel content=new JPanel(new BorderLayout());
@@ -43,7 +46,18 @@ public final class SkillSwapView extends JPanel {
      */
     public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
                          ContratacionOperaciones operaciones) {
+        this(controllers, userId, calificaciones, operaciones, List.of(), null);
+    }
+
+    /**
+     * Login simulado: con {@code cambiarUsuario} la barra lateral muestra el botón Cambiar usuario, que ofrece
+     * {@code usuarios} y le pasa el elegido a quien armó la vista (main), que la vuelve a crear con ese userId.
+     */
+    public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
+                         ContratacionOperaciones operaciones, List<String> usuarios, Consumer<String> cambiarUsuario) {
         this.controllers=controllers;
+        this.usuarios=List.copyOf(usuarios);
+        this.cambiarUsuario=cambiarUsuario;
         this.calificaciones=calificaciones;
         this.operaciones=operaciones;
         this.USER_ID=userId;
@@ -56,8 +70,31 @@ public final class SkillSwapView extends JPanel {
         JLabel logo=label("SkillSwap",new Font("SansSerif",Font.BOLD,25),Color.WHITE); logo.setAlignmentX(LEFT_ALIGNMENT); side.add(logo);
         JLabel sub=label("Aprendé. Compartí. Crecé.",SMALL,new Color(177,200,216)); sub.setAlignmentX(LEFT_ALIGNMENT); side.add(sub); side.add(Box.createVerticalStrut(28));
         side.add(nav("⌂  Inicio",this::showHome)); side.add(nav("⌕  Explorar",this::showExplore)); side.add(nav("▣  Mis publicaciones",this::showListings)); side.add(nav("✓  Contrataciones",this::showContracts)); side.add(nav("◈  SkillCoins",this::showWallet)); side.add(nav("●  Notificaciones",this::showNotifications)); side.add(nav("♙  Mi perfil",this::showProfile)); side.add(Box.createVerticalGlue());
+        if(cambiarUsuario!=null&&!usuarios.isEmpty()) side.add(nav("⇄  Cambiar usuario",this::elegirUsuario));
         JPanel user=new JPanel(new BorderLayout(10,0)); user.setOpaque(false); user.setBorder(new EmptyBorder(8,6,4,4)); user.setMaximumSize(new Dimension(Integer.MAX_VALUE,56)); user.setAlignmentX(LEFT_ALIGNMENT);
         JLabel avatar=avatar(iniciales(),36); user.add(avatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(perfilActivo.nombre(),H3,Color.WHITE));txt.add(label(perfilActivo.rol(),SMALL,new Color(177,200,216)));user.add(txt);side.add(user); return side;
+    }
+
+    /**
+     * Muestra los usuarios de la demo con su rol en la demo y avisa el elegido; si es el mismo, no hace nada.
+     * Todos los perfiles son PROFESIONAL: el rol que se muestra sale de si el usuario ofrece publicaciones
+     * (proveedor) o solo contrata (cliente). Debajo del combo, la bio del usuario seleccionado.
+     */
+    private void elegirUsuario(){
+        List<Models.Perfil> perfiles=usuarios.stream().map(id->controllers.perfiles().verPerfil(id)).toList();
+        JComboBox<String> combo=new JComboBox<>(perfiles.stream().map(p->p.nombre()+"  ·  "+rolEnLaDemo(p.id())+"  ("+p.id()+")").toArray(String[]::new));
+        JLabel bio=label("",SMALL,MUTED);
+        combo.addActionListener(e->bio.setText(perfiles.get(combo.getSelectedIndex()).bio()));
+        combo.setSelectedIndex(Math.max(0,usuarios.indexOf(USER_ID)));
+        JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Entrar como"));form.add(combo);form.add(bio);
+        if(JOptionPane.showConfirmDialog(this,form,"Cambiar usuario",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
+        String elegido=usuarios.get(combo.getSelectedIndex());
+        if(!elegido.equals(USER_ID))cambiarUsuario.accept(elegido);
+    }
+
+    private String rolEnLaDemo(String userId){
+        int propias=controllers.publicaciones().listarPropias(userId).size();
+        return propias>0?"Profesional, ofrece "+propias+(propias==1?" publicación":" publicaciones"):"Cliente, contrata mentorías";
     }
 
     private JButton nav(String text,Runnable action){JButton b=new JButton(text);b.setMaximumSize(new Dimension(Integer.MAX_VALUE,44));b.setHorizontalAlignment(SwingConstants.LEFT);b.setForeground(new Color(224,234,241));b.setBackground(NAVY);b.setBorder(new EmptyBorder(10,12,10,12));b.setFocusPainted(false);b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));b.addActionListener(e->action.run());return b;}
