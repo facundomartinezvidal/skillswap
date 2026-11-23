@@ -75,15 +75,26 @@ public final class SkillSwapView extends JPanel {
         JLabel avatar=avatar(iniciales(),36); user.add(avatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(perfilActivo.nombre(),H3,Color.WHITE));txt.add(label(perfilActivo.rol(),SMALL,new Color(177,200,216)));user.add(txt);side.add(user); return side;
     }
 
-    /** Muestra los usuarios de la demo por nombre y avisa el elegido; si es el mismo, no hace nada. */
+    /**
+     * Muestra los usuarios de la demo con su rol en la demo y avisa el elegido; si es el mismo, no hace nada.
+     * Todos los perfiles son PROFESIONAL: el rol que se muestra sale de si el usuario ofrece publicaciones
+     * (proveedor) o solo contrata (cliente). Debajo del combo, la bio del usuario seleccionado.
+     */
     private void elegirUsuario(){
         List<Models.Perfil> perfiles=usuarios.stream().map(id->controllers.perfiles().verPerfil(id)).toList();
-        JComboBox<String> combo=new JComboBox<>(perfiles.stream().map(p->p.nombre()+" ("+p.id()+")").toArray(String[]::new));
+        JComboBox<String> combo=new JComboBox<>(perfiles.stream().map(p->p.nombre()+"  ·  "+rolEnLaDemo(p.id())+"  ("+p.id()+")").toArray(String[]::new));
+        JLabel bio=label("",SMALL,MUTED);
+        combo.addActionListener(e->bio.setText(perfiles.get(combo.getSelectedIndex()).bio()));
         combo.setSelectedIndex(Math.max(0,usuarios.indexOf(USER_ID)));
-        JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Entrar como"));form.add(combo);
+        JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Entrar como"));form.add(combo);form.add(bio);
         if(JOptionPane.showConfirmDialog(this,form,"Cambiar usuario",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
         String elegido=usuarios.get(combo.getSelectedIndex());
         if(!elegido.equals(USER_ID))cambiarUsuario.accept(elegido);
+    }
+
+    private String rolEnLaDemo(String userId){
+        int propias=controllers.publicaciones().listarPropias(userId).size();
+        return propias>0?"Profesional, ofrece "+propias+(propias==1?" publicación":" publicaciones"):"Cliente, contrata mentorías";
     }
 
     private JButton nav(String text,Runnable action){JButton b=new JButton(text);b.setMaximumSize(new Dimension(Integer.MAX_VALUE,44));b.setHorizontalAlignment(SwingConstants.LEFT);b.setForeground(new Color(224,234,241));b.setBackground(NAVY);b.setBorder(new EmptyBorder(10,12,10,12));b.setFocusPainted(false);b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));b.addActionListener(e->action.run());return b;}
