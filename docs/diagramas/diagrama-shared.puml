@@ -64,6 +64,9 @@ package "Application" as pkg_Application #F5FAFF {
     class "PerfilDuplicadoException" as PerfilDuplicadoException #EEEEEE
     class "PerfilService" as PerfilService #EEEEEE
   }
+  package "publicacion" as pkg_Application_publicacion {
+    class "PublicacionService" as PublicacionService #EEEEEE
+  }
   package "shared" as pkg_Application_shared {
     class "Ids" as Ids {
       {static} +uuid(recurso: String, id: String): UUID
@@ -72,6 +75,9 @@ package "Application" as pkg_Application #F5FAFF {
     class "ConflictoDeConcurrenciaException" as ConflictoDeConcurrenciaException
     class "PermisoDenegadoException" as PermisoDenegadoException
     class "RecursoNoEncontradoException" as RecursoNoEncontradoException
+  }
+  package "wallet" as pkg_Application_wallet {
+    class "WalletService" as WalletService #EEEEEE
   }
 }
 
@@ -200,6 +206,8 @@ CanalEnvioFactory --> "1" EnvioNotificacion : email
 NotificacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
 PerfilService --> "1" ServicioIdentidad : servicioIdentidad
 PerfilService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+PublicacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
+WalletService --> "1" UnidadDeTrabajo : unidadDeTrabajo
 SuscriptorEvento ..> EventoDominio
 
 legend right

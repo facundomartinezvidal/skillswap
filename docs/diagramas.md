@@ -466,6 +466,7 @@ classDiagram
         +aceptarReprogramacion(String, Instant) FranjaId
         +rechazarReprogramacion(String, Instant)
         +calificar(String, Puntaje, String, Instant) Calificacion
+        +validarNuevaSolicitud(String)
         +ocupaCupo() boolean
         +esParticipante(String) boolean
         +extraerEventos() List~EventoDominio~
@@ -553,6 +554,7 @@ classDiagram
         +admiteReprogramacion() boolean
         +ocupaCupo() boolean
         +admiteCalificacion() boolean
+        +admiteNuevaSolicitud() boolean
     }
     class Pendiente {
         <<record, State>>

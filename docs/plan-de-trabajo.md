@@ -1,13 +1,13 @@
 # Guía para completar el trabajo práctico
 
-Estado por hito al 23/11/2026 (entrega: martes 24/11). ✅ hecho · 🔶 en revisión (PR abierto) · ⬜ pendiente.
+Estado por hito al 23/11/2026 (entrega: martes 24/11). ✅ hecho · ⬜ pendiente.
 
 ## Hito 1 · Diseño
 
 - ✅ Consigna transcripta en `docs/consigna/`.
-- 🔶 Historias de usuario con criterios de aceptación y tests: `docs/historias-de-usuario.md` (PR #27).
+- ✅ Historias de usuario con criterios de aceptación y tests: `docs/historias-de-usuario.md` (PR #27).
 - ✅ Informe de decisiones (problema → alternativa → consecuencias → evidencia), con patrones, SOLID/GRASP, casos de aceptación y cobertura: `docs/informe-decisiones.md`.
-- 🔶 Diagrama de clases UML de dominio y aplicación, con multiplicidades y patrones: `docs/uml/diagrama-clases-uml.png` (PR #27). Además, el diagrama generado desde el código (`docs/diagrama-clases.puml`) y los Mermaid de `docs/diagramas.md`.
+- ✅ Diagrama de clases UML de dominio y aplicación, con multiplicidades y patrones: `docs/uml/diagrama-clases-uml.png` (PR #27). Además, el diagrama generado desde el código (`docs/diagrama-clases.puml`) y los Mermaid de `docs/diagramas.md`.
 - ⬜ Diagrama en StarUML, a partir de `docs/uml/diagrama-clases-uml.png`.
 
 ## Hito 2 · Núcleo
@@ -25,11 +25,11 @@ Estado por hito al 23/11/2026 (entrega: martes 24/11). ✅ hecho · 🔶 en revi
 - ✅ Controllers reales, manejo uniforme de errores, interfaces del equipo, datos de demo y UI conectada (PRs #21 y #25).
 - ✅ JaCoCo con mínimo de 80 % en dominio + aplicación (PR #22).
 - ✅ README reproducible y guion de la demo (PR #23); guía paso a paso en `docs/guia-levantar-proyecto.md` (PR #27).
-- 🔶 UI: botón "Calificar", "Ver historial" y "Volver a solicitar" en las contrataciones terminadas, y orden "Más reciente" (PR #26).
+- ✅ UI: botón "Calificar", "Ver historial" y "Volver a solicitar" en las contrataciones terminadas, y orden "Más reciente" (PR #26). La regla de volver a solicitar está en el dominio.
+- ✅ UI: "Cambiar usuario" en la barra lateral (PR #29) y precio en el formulario de nueva publicación (PR #30).
 
 ## Pendiente para la entrega
 
-- ⬜ Revisar y mergear los PRs #26 y #27.
 - ⬜ Diagrama en StarUML.
 - ⬜ Exportar `docs/informe-decisiones.md` a PDF, con el diagrama de StarUML.
 - ⬜ Limpieza final del repo (ver `docs/pendientes-equipo.md`).

@@ -24,6 +24,9 @@ hide empty members
 title SkillSwap - Módulo wallet (dominio y aplicación)
 
 package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo #EEEEEE
+  }
   package "contratacion" as pkg_Application_contratacion {
     class "ContratacionService" as ContratacionService #EEEEEE
   }
@@ -33,6 +36,7 @@ package "Application" as pkg_Application #F5FAFF {
   package "wallet" as pkg_Application_wallet {
     class "WalletService" as WalletService {
       -walletRepository: WalletRepository
+      -unidadDeTrabajo: UnidadDeTrabajo
       -clock: Clock
       +consultarSaldo(userId: String): long
       +listarMovimientos(userId: String, pagina: PaginaSolicitada): Pagina<MovimientoDTO>
@@ -114,6 +118,7 @@ Wallet "1" *-- "*" Movimiento : movimientosNuevos
 ContratacionService --> "1" RetencionDePagos : retencionDePagos
 ContratacionService --> "1" WalletRepository : walletRepository
 PerfilService --> "1" WalletRepository : walletRepository
+WalletService --> "1" UnidadDeTrabajo : unidadDeTrabajo
 WalletService --> "1" WalletRepository : walletRepository
 WalletService ..> MovimientoDTO
 WalletService ..> Wallet

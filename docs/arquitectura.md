@@ -117,6 +117,10 @@ que la infraestructura no lance excepciones de negocio.
   deduce como la otra parte, así que nadie puede calificarse a sí mismo. El
   puntaje (`Puntaje`, en `domain/shared`) va de 1 a 5 y el comentario es
   opcional. Calificar no cambia el estado ni agrega un cambio al historial.
+- `RECHAZADA` no se reabre: el cliente puede volver a solicitar la misma
+  publicación, y eso crea otra contratación con el mismo objetivo. Lo valida el
+  dominio: `Contratacion.validarNuevaSolicitud(actor)` exige que sea el cliente y
+  `admiteNuevaSolicitud()` del State solo es `true` en `Rechazada`.
 - `Perfil` se identifica por el `userId` del servicio de identidad (un usuario
   tiene un solo perfil) y tiene un `TipoPerfil` fijo desde la creación:
   `PROFESIONAL` (publica ofertas) u `ORGANIZACION` (publica desafíos). Guarda
@@ -286,7 +290,8 @@ perfil. Un suscriptor que falla no deshace la operación ni corta a los demás.
   en un `JOptionPane`, porque la vista no atrapa excepciones.
 - **Adaptaciones a la UI:** `avanzar` decide según estado y rol (aceptar, pagar, iniciar o completar);
   `solicitar` usa la primera franja futura con lugar; `crearBorrador` crea con cupo 1 y una franja a
-  7 días; los listados de la UI piden la primera página de 50.
+  7 días, con el precio que pide el formulario; los listados de la UI piden la primera página de 50;
+  "Cambiar usuario" rearma la vista con otro `userId` en la misma ventana.
 - **Datos de demo:** `DatosDemo` los carga con los Services (sirve igual con MySQL y en memoria) y es
   idempotente: si Mateo ya tiene perfil, no hace nada.
 

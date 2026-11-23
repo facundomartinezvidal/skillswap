@@ -39,7 +39,7 @@ aceptación de la consigna, en `src/test/java/.../controllers/CasosDeAceptacionT
 **para** recibir solicitudes.
 
 - El tipo de publicación sale del tipo de perfil: un profesional publica una oferta y una organización, un desafío.
-- Se arma un BORRADOR editable y no visible.
+- Se arma un BORRADOR editable y no visible. Desde la UI, el formulario pide título, descripción, categoría y precio en SkillCoins.
 - Para publicar hacen falta un título, una categoría, un precio no negativo y al menos una franja. Si falta algo, se rechaza (**caso 2**).
 - Ya publicada, se encuentra con la búsqueda (**caso 1**).
 
@@ -98,9 +98,9 @@ aceptación de la consigna, en `src/test/java/.../controllers/CasosDeAceptacionT
 **Como** proveedor, **quiero** aceptar o rechazar las solicitudes que recibo, **para** administrar mi agenda.
 
 - Al aceptar se reserva el cupo de la franja en una transacción. Dos aceptaciones no consumen el último cupo (**caso 4**).
-- RECHAZADA es un estado final: solo se consulta el historial. El cliente puede volver a solicitar, y eso crea una contratación nueva.
+- RECHAZADA es un estado final: solo se consulta el historial. El cliente puede volver a solicitar, y eso crea una contratación nueva con el mismo objetivo. La regla está en el dominio: `Contratacion.validarNuevaSolicitud` (solo el cliente) y `admiteNuevaSolicitud()` del State (solo RECHAZADA).
 
-*Tests:* casos 3 y 4, `ContratacionTerminadaTest` (llega con el PR #26).
+*Tests:* casos 3 y 4, `ContratacionTerminadaTest`, `ContratacionTest`, `EstadoContratacionTest`, `ContratacionServiceTest`.
 
 ## HU-10 · Pagar con SkillCoins
 
