@@ -58,7 +58,8 @@ class PasoSiguienteTest {
     }
 
     private void assertPaso(String userId, String contratacionId, String rol, String accion, String detalle) {
-        assertEquals(new PasoSiguienteVista(rol, accion, detalle), c.contrataciones().pasoSiguiente(userId, contratacionId));
+        assertEquals(new PasoSiguienteVista(rol, accion, detalle, null, false),
+                c.contrataciones().pasoSiguiente(userId, contratacionId));
     }
 
     private void avanzaSoloQuienTieneAccion(String conAccion, String sinAccion, String id, EstadoContratacion despues) {

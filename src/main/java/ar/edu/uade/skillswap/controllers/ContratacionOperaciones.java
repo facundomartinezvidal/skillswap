@@ -46,6 +46,15 @@ public interface ContratacionOperaciones {
      */
     PasoSiguienteVista pasoSiguiente(String userId, String contratacionId);
 
+    /**
+     * El comprobante de la contratación en texto, una línea por dato: publicación, partes, sesión, importe,
+     * fechas de pago y de cierre, reintegro si se canceló, y calificaciones.
+     */
+    List<String> verComprobante(String userId, String contratacionId);
+
+    /** Las franjas de la publicación a las que se puede mover la sesión: disponibles y distintas de la actual. */
+    List<FranjaVista> listarFranjasParaReprogramar(String userId, String contratacionId);
+
     /** Si quien mira la contratación es el cliente (el único que puede volver a solicitar). */
     boolean esCliente(String userId, String contratacionId);
 

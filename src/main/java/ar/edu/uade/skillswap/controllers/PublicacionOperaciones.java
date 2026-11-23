@@ -9,6 +9,9 @@ import java.util.List;
 /** Datos de la publicación que la UI de la cátedra no carga: cupo, franjas y promociones. */
 public interface PublicacionOperaciones {
 
+    /** Las publicaciones propias, en todos los estados, paginadas. */
+    PaginaVista<Publicacion> listarPropias(String userId, int pagina, int tamanio);
+
     /**
      * El borrador nace con las franjas que elige el autor, cada una de la duración de la sesión. Más franjas se
      * agregan con {@link #agregarFranja} mientras siga en borrador.

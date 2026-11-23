@@ -1,7 +1,10 @@
 package ar.edu.uade.skillswap.controllers.impl;
 
 import ar.edu.uade.skillswap.application.busqueda.BusquedaService;
+import ar.edu.uade.skillswap.controllers.PaginaVista;
 import ar.edu.uade.skillswap.controllers.RecomendacionController;
+import ar.edu.uade.skillswap.domain.shared.Pagina;
+import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.Publicacion;
 
 import java.util.List;
@@ -25,5 +28,18 @@ public class RecomendacionControllerImpl implements RecomendacionController {
         return ejecutar(() -> busquedaService.recomendar(userId, CANTIDAD_RECOMENDADAS).stream()
                 .map(ModelosMapper::aModelo)
                 .toList());
+    }
+
+    /**
+     * La estrategia ordena todas las candidatas (las publicadas de otros autores); de ese orden se corta la
+     * página pedida, así el total es el de todas las recomendables.
+     */
+    @Override
+    public PaginaVista<Publicacion> recomendar(String userId, int pagina, int tamanio) {
+        return ejecutar(() -> {
+            var solicitada = new PaginaSolicitada(pagina, tamanio);
+            var todas = busquedaService.recomendar(userId, Integer.MAX_VALUE);
+            return ModelosMapper.aVista(Pagina.de(todas, solicitada), ModelosMapper::aModelo);
+        });
     }
 }

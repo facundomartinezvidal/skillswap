@@ -8,4 +8,7 @@ import java.util.List;
 public interface RecomendacionController {
 
     List<Publicacion> recomendar(String userId);
+
+    /** Todas las recomendaciones, de la más afín a la menos, paginadas. */
+    PaginaVista<Publicacion> recomendar(String userId, int pagina, int tamanio);
 }

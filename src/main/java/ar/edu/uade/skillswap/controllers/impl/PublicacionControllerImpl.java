@@ -7,9 +7,11 @@ import ar.edu.uade.skillswap.application.publicacion.dto.PublicacionDTO;
 import ar.edu.uade.skillswap.application.publicacion.dto.FranjaDTO;
 import ar.edu.uade.skillswap.controllers.FranjaVista;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
+import ar.edu.uade.skillswap.controllers.PaginaVista;
 import ar.edu.uade.skillswap.controllers.PublicacionOperaciones;
 import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.domain.shared.DomainException;
+import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.EstadoPublicacion;
 import ar.edu.uade.skillswap.model.Models.Modalidad;
 import ar.edu.uade.skillswap.model.Models.Publicacion;
@@ -45,12 +47,16 @@ public class PublicacionControllerImpl implements UiControllers.PublicacionContr
         this.clock = Objects.requireNonNull(clock);
     }
 
+    /** La UI no pagina: ve la primera página. */
     @Override
     public List<Publicacion> listarPropias(String userId) {
-        return ejecutar(() -> publicacionService.listarPropias(userId, ModelosMapper.PRIMERA_PAGINA)
-                .elementos().stream()
-                .map(ModelosMapper::aModelo)
-                .toList());
+        return listarPropias(userId, 0, ModelosMapper.TAMANIO_UI).elementos();
+    }
+
+    @Override
+    public PaginaVista<Publicacion> listarPropias(String userId, int pagina, int tamanio) {
+        return ejecutar(() -> ModelosMapper.aVista(
+                publicacionService.listarPropias(userId, new PaginaSolicitada(pagina, tamanio)), ModelosMapper::aModelo));
     }
 
     /**

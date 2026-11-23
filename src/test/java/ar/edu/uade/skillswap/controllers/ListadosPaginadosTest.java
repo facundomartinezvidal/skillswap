@@ -29,6 +29,31 @@ class ListadosPaginadosTest {
     private final SkillSwapControllers c = demo.controllers;
 
     @Test
+    void lasPublicacionesPropiasSePaginan() {
+        var primera = c.publicaciones().listarPropias(MATEO, 0, 1);
+        var segunda = c.publicaciones().listarPropias(MATEO, 1, 1);
+
+        assertEquals(2, primera.total());
+        assertEquals(1, primera.elementos().size());
+        assertEquals(1, segunda.elementos().size());
+        assertTrue(!primera.elementos().get(0).id().equals(segunda.elementos().get(0).id()));
+        assertEquals(c.publicaciones().listarPropias(MATEO).size(), primera.total());
+    }
+
+    /** Las recomendaciones paginadas siguen el mismo orden que la fila de la pantalla de inicio. */
+    @Test
+    void lasRecomendacionesSePaginanEnElMismoOrden() {
+        var fila = c.recomendaciones().recomendar(EntornoDemo.ANA);
+        var primera = c.recomendaciones().recomendar(EntornoDemo.ANA, 0, 2);
+        var segunda = c.recomendaciones().recomendar(EntornoDemo.ANA, 1, 2);
+
+        assertEquals(fila.subList(0, 2), primera.elementos());
+        assertEquals(fila.get(2), segunda.elementos().get(0));
+        assertTrue(primera.total() >= fila.size(), "total: " + primera.total());
+        assertEquals(primera.total(), segunda.total());
+    }
+
+    @Test
     void buscarPorRangoDePrecioOrdenadoPorMenorPrecio() {
         var pagina = c.busqueda().buscar(new Criterios(null, null, null, 150, 250, null, null, Orden.MENOR_PRECIO),
                 0, 10);

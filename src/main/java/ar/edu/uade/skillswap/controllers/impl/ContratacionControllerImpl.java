@@ -11,14 +11,17 @@ import ar.edu.uade.skillswap.application.shared.exception.RecursoNoEncontradoExc
 import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
 import ar.edu.uade.skillswap.controllers.PaginaVista;
+import ar.edu.uade.skillswap.controllers.FranjaVista;
 import ar.edu.uade.skillswap.controllers.PasoSiguienteVista;
 import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.domain.shared.PaginaSolicitada;
 import ar.edu.uade.skillswap.model.Models.Contratacion;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -148,7 +151,69 @@ public class ContratacionControllerImpl implements UiControllers.ContratacionCon
                 case INICIAR -> "Iniciar sesión";
                 case COMPLETAR -> "Completar sesión";
             };
-            return new PasoSiguienteVista(esCliente ? "Cliente" : "Proveedor", accion, detalle(c.estado(), esCliente, otro));
+            var propuesta = c.propuesta();
+            var detalle = detalle(c.estado(), esCliente, otro);
+            if (propuesta == null) {
+                return new PasoSiguienteVista(esCliente ? "Cliente" : "Proveedor", accion, detalle, null, false);
+            }
+            var porMi = propuesta.propuestaPor().equals(userId);
+            var nuevoInicio = ModelosMapper.aFecha(propuesta.inicio());
+            var cuando = nuevoInicio.format(FORMATO_FECHA);
+            detalle += porMi ? " Propusiste pasar la sesión al " + cuando + ": falta que " + otro + " responda."
+                    : " " + otro + " propuso pasar la sesión al " + cuando + ".";
+            return new PasoSiguienteVista(esCliente ? "Cliente" : "Proveedor", accion, detalle, nuevoInicio, porMi);
+        });
+    }
+
+    @Override
+    public List<String> verComprobante(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var c = contratacionService.verContratacion(userId, contratacionId);
+            var nombres = new HashMap<String, String>();
+            var lineas = new ArrayList<String>();
+            lineas.add("Contratación " + c.id());
+            lineas.add("Publicación: " + c.tituloPublicacion());
+            lineas.add("Cliente: " + nombres.computeIfAbsent(c.clienteId(), this::nombreVisible));
+            lineas.add("Proveedor: " + nombres.computeIfAbsent(c.proveedorId(), this::nombreVisible));
+            lineas.add("Sesión: " + ModelosMapper.aFecha(c.inicioSesion()).format(FORMATO_FECHA));
+            lineas.add("Importe: " + c.precioAcordado() + " SkillCoins");
+            lineas.add("Estado: " + c.estado());
+            for (var cambio : c.historial()) {
+                switch (cambio.hacia()) {
+                    case "CONFIRMADA" -> lineas.add("Pagado el " + fecha(cambio.fecha()));
+                    case "COMPLETADA" -> lineas.add("Completada el " + fecha(cambio.fecha()));
+                    case "CANCELADA" -> lineas.add("Cancelada el " + fecha(cambio.fecha()));
+                    default -> { }
+                }
+            }
+            if (c.reintegro() != null) {
+                lineas.add("Reintegro: " + c.reintegro().alCliente() + " SkillCoins al cliente y "
+                        + c.reintegro().alProveedor() + " al proveedor");
+            }
+            for (var calificacion : c.calificaciones()) {
+                var comentario = calificacion.comentario() == null || calificacion.comentario().isBlank()
+                        ? "" : " · " + calificacion.comentario();
+                lineas.add("Calificación de " + nombres.computeIfAbsent(calificacion.autorId(), this::nombreVisible)
+                        + ": " + calificacion.puntaje() + "/5" + comentario);
+            }
+            return List.copyOf(lineas);
+        });
+    }
+
+    private String fecha(Instant instante) {
+        return ModelosMapper.aFecha(instante).format(FORMATO_FECHA);
+    }
+
+    @Override
+    public List<FranjaVista> listarFranjasParaReprogramar(String userId, String contratacionId) {
+        return ejecutar(() -> {
+            var c = contratacionService.verContratacion(userId, contratacionId);
+            var ahora = clock.instant();
+            return publicacionService.verPublicacion(userId, c.publicacionId()).franjas().stream()
+                    .filter(f -> !f.id().equals(c.franjaId()) && ModelosMapper.estaDisponible(f, ahora))
+                    .sorted(Comparator.comparing(FranjaDTO::inicio))
+                    .map(f -> ModelosMapper.aVista(f, ahora))
+                    .toList();
         });
     }
 
