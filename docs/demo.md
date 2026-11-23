@@ -53,7 +53,7 @@ Al arrancar se aplican las migraciones de Flyway y se cargan los datos de demo u
 6. **Notificaciones (caso 8).** Cada operación generó notificaciones para los interesados;
    marcar una como leída.
 7. **Mis publicaciones (caso 2).** "Publicar" el borrador de SQL. Pausar una publicación y
-   volver a publicarla. Crear una "Nueva publicación" y publicarla.
+   volver a publicarla. Crear una "Nueva publicación" eligiendo el precio en SkillCoins y publicarla.
 8. **Persistencia.** Cerrar y volver a abrir la app con MySQL: todo lo hecho sigue ahí y los
    datos de demo no se duplican.
 

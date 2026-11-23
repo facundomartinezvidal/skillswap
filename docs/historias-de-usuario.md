@@ -39,7 +39,7 @@ aceptación de la consigna, en `src/test/java/.../controllers/CasosDeAceptacionT
 **para** recibir solicitudes.
 
 - El tipo de publicación sale del tipo de perfil: un profesional publica una oferta y una organización, un desafío.
-- Se arma un BORRADOR editable y no visible.
+- Se arma un BORRADOR editable y no visible. Desde la UI, el formulario pide título, descripción, categoría y precio en SkillCoins.
 - Para publicar hacen falta un título, una categoría, un precio no negativo y al menos una franja. Si falta algo, se rechaza (**caso 2**).
 - Ya publicada, se encuentra con la búsqueda (**caso 1**).
 

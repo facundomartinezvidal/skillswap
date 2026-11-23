@@ -26,6 +26,7 @@ Estado por hito al 23/11/2026 (entrega: martes 24/11). ✅ hecho · ⬜ pendient
 - ✅ JaCoCo con mínimo de 80 % en dominio + aplicación (PR #22).
 - ✅ README reproducible y guion de la demo (PR #23); guía paso a paso en `docs/guia-levantar-proyecto.md` (PR #27).
 - ✅ UI: botón "Calificar", "Ver historial" y "Volver a solicitar" en las contrataciones terminadas, y orden "Más reciente" (PR #26). La regla de volver a solicitar está en el dominio.
+- ✅ UI: "Cambiar usuario" en la barra lateral (PR #29) y precio en el formulario de nueva publicación (PR #30).
 
 ## Pendiente para la entrega
 

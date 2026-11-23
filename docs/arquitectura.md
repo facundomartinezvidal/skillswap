@@ -290,7 +290,8 @@ perfil. Un suscriptor que falla no deshace la operación ni corta a los demás.
   en un `JOptionPane`, porque la vista no atrapa excepciones.
 - **Adaptaciones a la UI:** `avanzar` decide según estado y rol (aceptar, pagar, iniciar o completar);
   `solicitar` usa la primera franja futura con lugar; `crearBorrador` crea con cupo 1 y una franja a
-  7 días; los listados de la UI piden la primera página de 50.
+  7 días, con el precio que pide el formulario; los listados de la UI piden la primera página de 50;
+  "Cambiar usuario" rearma la vista con otro `userId` en la misma ventana.
 - **Datos de demo:** `DatosDemo` los carga con los Services (sirve igual con MySQL y en memoria) y es
   idempotente: si Mateo ya tiene perfil, no hace nada.
 

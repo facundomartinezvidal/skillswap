@@ -52,8 +52,9 @@ Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no 
 
 **Hecho**
 
-- Todas las PRs (#4 a #27) están en `main`, con CI en verde: 579 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas y 95,0 % de ramas.
+- Todas las PRs (#4 a #30) están en `main`, con CI en verde: 580 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas y 95,0 % de ramas.
 - Puntos 1, 2, 3 y 5 resueltos (PR #26 y #27). La regla de "volver a solicitar" quedó en el dominio (`Contratacion.validarNuevaSolicitud` y `admiteNuevaSolicitud()` del State).
+- UI: "Cambiar usuario" en la barra lateral (#29) y precio en el formulario de nueva publicación (#30).
 - Diagrama UML base en `docs/uml/`, historias de usuario y la guía [`guia-levantar-proyecto.md`](guia-levantar-proyecto.md).
 
 **Falta, en este orden**
