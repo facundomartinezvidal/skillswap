@@ -718,6 +718,45 @@ class ContratacionTest {
     }
 
     @Nested
+    class VolverASolicitar {
+
+        @Test
+        void elClienteDeUnaRechazadaPuedeYNadaCambia() {
+            var contratacion = rechazada();
+            var historial = contratacion.historial();
+
+            contratacion.validarNuevaSolicitud(CLIENTE);
+
+            assertSinCambios(contratacion, "RECHAZADA", historial);
+        }
+
+        @Test
+        void niElProveedorNiUnTerceroPueden() {
+            for (var actor : List.of(PROVEEDOR, AJENO)) {
+                var ex = assertThrows(AccionNoPermitidaException.class,
+                        () -> rechazada().validarNuevaSolicitud(actor));
+                assertEquals(actor, ex.actorId());
+            }
+        }
+
+        @Test
+        void soloDesdeRechazada() {
+            Map<String, Supplier<Contratacion>> otras = new LinkedHashMap<>();
+            otras.put("PENDIENTE", ContratacionTest::pendiente);
+            otras.put("ACEPTADA", ContratacionTest::aceptada);
+            otras.put("COMPLETADA", ContratacionTest::completada);
+            otras.put("CANCELADA", ContratacionTest::cancelada);
+
+            otras.forEach((estado, crear) -> {
+                var ex = assertThrows(TransicionInvalidaException.class,
+                        () -> crear.get().validarNuevaSolicitud(CLIENTE), estado);
+                assertEquals(estado, ex.estado());
+                assertEquals("volver a solicitar", ex.accion());
+            });
+        }
+    }
+
+    @Nested
     class Historial {
 
         @Test

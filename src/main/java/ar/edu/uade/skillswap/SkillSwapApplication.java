@@ -8,7 +8,6 @@ import ar.edu.uade.skillswap.application.perfil.PerfilService;
 import ar.edu.uade.skillswap.application.publicacion.PublicacionService;
 import ar.edu.uade.skillswap.application.wallet.WalletService;
 import ar.edu.uade.skillswap.controllers.OperacionRechazadaException;
-import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.controllers.impl.SkillSwapControllers;
 import ar.edu.uade.skillswap.infrastructure.configuracion.BackendEnMemoria;
 import ar.edu.uade.skillswap.infrastructure.configuracion.BackendJpa;
@@ -43,12 +42,12 @@ public final class SkillSwapApplication {
         Theme.install();
         var argumentos = Arrays.asList(args);
         var clock = Clock.systemDefaultZone();
-        UiControllers controllers = crearControllers(argumentos, clock);
+        SkillSwapControllers controllers = crearControllers(argumentos, clock);
         int indiceUsuario = argumentos.indexOf("--usuario");
         String usuario = indiceUsuario >= 0 && indiceUsuario + 1 < args.length ? args[indiceUsuario + 1] : "user-mateo";
         int screenshot = argumentos.indexOf("--screenshot");
         if (screenshot >= 0 && screenshot + 1 < args.length) {
-            SkillSwapView view = new SkillSwapView(controllers, usuario);
+            SkillSwapView view = new SkillSwapView(controllers, usuario, controllers.calificaciones(), controllers.contrataciones());
             view.setSize(1365, 768); view.doLayout(); layoutTree(view);
             BufferedImage image = new BufferedImage(1365,768,BufferedImage.TYPE_INT_ARGB);
             Graphics2D g=image.createGraphics();g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);view.printAll(g);g.dispose();
@@ -59,7 +58,7 @@ public final class SkillSwapApplication {
             JFrame frame=new JFrame("SkillSwap");
             frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             frame.setMinimumSize(new Dimension(1120,700));frame.setSize(1365,820);frame.setLocationRelativeTo(null);
-            frame.setContentPane(new SkillSwapView(controllers, usuario));frame.setVisible(true);
+            frame.setContentPane(new SkillSwapView(controllers, usuario, controllers.calificaciones(), controllers.contrataciones()));frame.setVisible(true);
         });
     }
 

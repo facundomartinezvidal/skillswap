@@ -96,6 +96,13 @@ class EstadoContratacionTest {
     }
 
     @Test
+    void soloRechazadaAdmiteVolverASolicitar() {
+        for (var estado : ESTADOS) {
+            assertEquals(estado instanceof Rechazada, estado.admiteNuevaSolicitud(), estado.nombre());
+        }
+    }
+
+    @Test
     void nombresCoincidenConLosEstadosDeLaConsigna() {
         assertEquals(List.of("PENDIENTE", "ACEPTADA", "CONFIRMADA", "EN_CURSO", "COMPLETADA", "RECHAZADA", "CANCELADA"),
                 ESTADOS.stream().map(EstadoContratacion::nombre).toList());

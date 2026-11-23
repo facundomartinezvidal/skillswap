@@ -1,5 +1,8 @@
 package ar.edu.uade.skillswap.ui;
 
+import ar.edu.uade.skillswap.controllers.CalificacionController;
+import ar.edu.uade.skillswap.controllers.ContratacionOperaciones;
+
 import ar.edu.uade.skillswap.model.Models;
 
 import ar.edu.uade.skillswap.controllers.UiControllers;
@@ -18,6 +21,8 @@ public final class SkillSwapView extends JPanel {
     // El login simulado entrega el userId activo; la vista lo pasa a cada operación.
     private final String USER_ID;
     private final Models.Perfil perfilActivo;
+    private final CalificacionController calificaciones;
+    private final ContratacionOperaciones operaciones;
     private JButton coins;
     private final UiControllers controllers;
     private final JPanel content=new JPanel(new BorderLayout());
@@ -29,7 +34,18 @@ public final class SkillSwapView extends JPanel {
     }
 
     public SkillSwapView(UiControllers controllers, String userId) {
+        this(controllers, userId, null, null);
+    }
+
+    /**
+     * Las operaciones del equipo llegan aparte porque {@link UiControllers} es de la cátedra. Pueden ser null:
+     * en ese caso no se muestran los botones Calificar, Ver historial ni Volver a solicitar.
+     */
+    public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
+                         ContratacionOperaciones operaciones) {
         this.controllers=controllers;
+        this.calificaciones=calificaciones;
+        this.operaciones=operaciones;
         this.USER_ID=userId;
         this.perfilActivo=controllers.perfiles().verPerfil(userId); setLayout(new BorderLayout()); setBackground(BG);
         add(sidebar(),BorderLayout.WEST); add(shell(),BorderLayout.CENTER); showHome();
@@ -58,7 +74,7 @@ public final class SkillSwapView extends JPanel {
     private void showExplore(){showExplore("");}
     private void showExplore(String initial){showExploreWith(initial,"Todas");}
     private void showExploreCategory(String category){showExploreWith("",category);}
-    private void showExploreWith(String initial,String category){JPanel p=base();JPanel filters=card(new FlowLayout(FlowLayout.LEFT,10,0));filters.setAlignmentX(LEFT_ALIGNMENT);JTextField q=new JTextField(initial,24);q.setBorder(new EmptyBorder(10,12,10,12));JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().toArray(String[]::new));cat.setSelectedItem(category);JComboBox<String> order=new JComboBox<>(new String[]{"Relevancia","Mejor reputación","Menor precio"});JButton go=button("Buscar",true);filters.add(q);filters.add(cat);filters.add(order);filters.add(go);p.add(filters);p.add(Box.createVerticalStrut(22));JPanel results=new JPanel();results.setOpaque(false);results.setLayout(new BoxLayout(results,BoxLayout.Y_AXIS));Runnable refresh=()->{results.removeAll();List<Publicacion> list=controllers.busqueda().buscar(new FiltrosBusqueda(q.getText(),(String)cat.getSelectedItem(),null,0,(String)order.getSelectedItem()));addSection(results,list.size()+" resultados","Mentorías y servicios disponibles");results.add(cardGrid(list));results.revalidate();results.repaint();};go.addActionListener(e->refresh.run());q.addActionListener(e->refresh.run());p.add(results);refresh.run();page("Explorar",p);}
+    private void showExploreWith(String initial,String category){JPanel p=base();JPanel filters=card(new FlowLayout(FlowLayout.LEFT,10,0));filters.setAlignmentX(LEFT_ALIGNMENT);JTextField q=new JTextField(initial,24);q.setBorder(new EmptyBorder(10,12,10,12));JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().toArray(String[]::new));cat.setSelectedItem(category);JComboBox<String> order=new JComboBox<>(new String[]{"Relevancia","Mejor reputación","Menor precio","Más reciente"});JButton go=button("Buscar",true);filters.add(q);filters.add(cat);filters.add(order);filters.add(go);p.add(filters);p.add(Box.createVerticalStrut(22));JPanel results=new JPanel();results.setOpaque(false);results.setLayout(new BoxLayout(results,BoxLayout.Y_AXIS));Runnable refresh=()->{results.removeAll();List<Publicacion> list=controllers.busqueda().buscar(new FiltrosBusqueda(q.getText(),(String)cat.getSelectedItem(),null,0,(String)order.getSelectedItem()));addSection(results,list.size()+" resultados","Mentorías y servicios disponibles");results.add(cardGrid(list));results.revalidate();results.repaint();};go.addActionListener(e->refresh.run());q.addActionListener(e->refresh.run());p.add(results);refresh.run();page("Explorar",p);}
 
     private JPanel cardGrid(List<Publicacion> list){JPanel grid=new JPanel(new GridLayout(0,3,14,14));grid.setOpaque(false);grid.setAlignmentX(LEFT_ALIGNMENT);for(Publicacion x:list)grid.add(listingCard(x));return grid;}
     private JComponent listingCard(Publicacion x){JPanel c=card(new BorderLayout(0,12));JPanel top=new JPanel(new BorderLayout());top.setOpaque(false);top.add(pill(x.categoria(),TEAL),BorderLayout.WEST);top.add(label("★ "+x.reputacion(),H3,GOLD),BorderLayout.EAST);c.add(top,BorderLayout.NORTH);JPanel mid=new JPanel();mid.setOpaque(false);mid.setLayout(new BoxLayout(mid,BoxLayout.Y_AXIS));JLabel t=label("<html><div style='width:210px'>"+x.titulo()+"</div></html>",H3,TEXT);mid.add(t);mid.add(Box.createVerticalStrut(7));mid.add(label("Por "+x.proveedor(),SMALL,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label("<html><div style='width:215px;color:#677480'>"+x.descripcion()+"</div></html>",BODY,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label(x.modalidad()+"  ·  "+x.duracionMinutos()+" min",SMALL,MUTED));c.add(mid);JPanel bottom=new JPanel(new BorderLayout());bottom.setOpaque(false);bottom.add(label(x.precio()+" ◈",new Font("SansSerif",Font.BOLD,20),NAVY),BorderLayout.WEST);JButton detail=button("Ver detalle",true);detail.addActionListener(e->showDetail(x));bottom.add(detail,BorderLayout.EAST);c.add(bottom,BorderLayout.SOUTH);return c;}
@@ -69,7 +85,7 @@ public final class SkillSwapView extends JPanel {
 
     private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,150);message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();}}
 
-    private void showContracts(){JPanel p=base();addSection(p,"Tus contrataciones","Avanzá el flujo para probar los estados del sistema");for(Contratacion x:controllers.contrataciones().listarContrataciones(USER_ID)){JPanel row=card(new BorderLayout(16,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,105));JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(x.titulo(),H3,TEXT));txt.add(Box.createVerticalStrut(5));txt.add(label(x.contraparte()+"  ·  "+x.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")),BODY,MUTED));row.add(txt,BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoContratacion.COMPLETADA?TEAL:NAVY_2),BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));actions.setOpaque(false);if(x.estado()!=EstadoContratacion.COMPLETADA&&x.estado()!=EstadoContratacion.CANCELADA){JButton next=button("Avanzar estado",true);next.addActionListener(e->intentar(()->{controllers.contrataciones().avanzar(USER_ID,x.id());showContracts();}));actions.add(next);JButton cancel=button("Cancelar",false);cancel.addActionListener(e->intentar(()->{controllers.contrataciones().cancelar(USER_ID,x.id());showContracts();}));actions.add(cancel);}row.add(actions,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(11));}page("Contrataciones",p);}
+    private void showContracts(){JPanel p=base();addSection(p,"Tus contrataciones","Avanzá el flujo para probar los estados del sistema");for(Contratacion x:controllers.contrataciones().listarContrataciones(USER_ID)){JPanel row=card(new BorderLayout(16,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,105));JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(x.titulo(),H3,TEXT));txt.add(Box.createVerticalStrut(5));txt.add(label(x.contraparte()+"  ·  "+x.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")),BODY,MUTED));row.add(txt,BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoContratacion.COMPLETADA?TEAL:NAVY_2),BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));actions.setOpaque(false);if(x.estado()==EstadoContratacion.COMPLETADA&&calificaciones!=null){JButton rate=button("Calificar",true);rate.addActionListener(e->calificar(x));actions.add(rate);}boolean terminada=x.estado()==EstadoContratacion.RECHAZADA||x.estado()==EstadoContratacion.CANCELADA;if(terminada&&operaciones!=null){JButton hist=button("Ver historial",false);hist.addActionListener(e->intentar(()->verHistorial(x)));actions.add(hist);}if(x.estado()==EstadoContratacion.RECHAZADA&&operaciones!=null&&operaciones.esCliente(USER_ID,x.id())){JButton again=button("Volver a solicitar",true);again.addActionListener(e->intentar(()->{operaciones.volverASolicitar(USER_ID,x.id());message("¡Solicitud enviada!","Se creó una solicitud nueva para la misma publicación.");showContracts();}));actions.add(again);}if(x.estado()!=EstadoContratacion.COMPLETADA&&!terminada){JButton next=button("Avanzar estado",true);next.addActionListener(e->intentar(()->{controllers.contrataciones().avanzar(USER_ID,x.id());showContracts();}));actions.add(next);JButton cancel=button("Cancelar",false);cancel.addActionListener(e->intentar(()->{controllers.contrataciones().cancelar(USER_ID,x.id());showContracts();}));actions.add(cancel);}row.add(actions,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(11));}page("Contrataciones",p);}
 
     private void showWallet(){JPanel p=base();JPanel balance=new Theme.RoundedPanel(22,NAVY_2);balance.setLayout(new BorderLayout());balance.setBorder(new EmptyBorder(24,26,24,26));balance.setMaximumSize(new Dimension(Integer.MAX_VALUE,120));JPanel btxt=new JPanel();btxt.setOpaque(false);btxt.setLayout(new BoxLayout(btxt,BoxLayout.Y_AXIS));btxt.add(label("SALDO DISPONIBLE",SMALL,new Color(184,209,222)));btxt.add(label(controllers.wallet().consultarSaldo(USER_ID)+" SkillCoins",new Font("SansSerif",Font.BOLD,30),Color.WHITE));balance.add(btxt);JButton add=button("+ Acreditar demo",true);add.addActionListener(e->intentar(()->{controllers.wallet().acreditarDemo(USER_ID,500);showWallet();}));balance.add(add,BorderLayout.EAST);balance.setAlignmentX(LEFT_ALIGNMENT);p.add(balance);p.add(Box.createVerticalStrut(24));addSection(p,"Movimientos recientes",null);for(Movimiento m:controllers.wallet().listarMovimientos(USER_ID)){JPanel row=card(new BorderLayout());row.setMaximumSize(new Dimension(Integer.MAX_VALUE,72));JPanel t=new JPanel();t.setOpaque(false);t.setLayout(new BoxLayout(t,BoxLayout.Y_AXIS));t.add(label(m.concepto(),H3,TEXT));t.add(label(m.fecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm")),SMALL,MUTED));row.add(t);row.add(label((m.importe()>0?"+":"")+m.importe()+" ◈",H3,m.importe()>0?TEAL:DANGER),BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(8));}page("SkillCoins",p);}
 
@@ -100,5 +116,34 @@ public final class SkillSwapView extends JPanel {
             JOptionPane.showMessageDialog(this, error.getMessage(), "No se pudo completar la operación",
                     JOptionPane.WARNING_MESSAGE);
         }
+    }
+
+    /** Pide puntaje y comentario; un segundo intento sobre la misma contratación muestra el error del dominio. */
+    private void calificar(Contratacion contratacion) {
+        JComboBox<Integer> puntaje = new JComboBox<>(new Integer[]{5, 4, 3, 2, 1});
+        JTextField comentario = new JTextField(24);
+        JPanel form = new JPanel(new GridLayout(0, 1, 4, 5));
+        form.add(new JLabel("Puntaje para " + contratacion.contraparte()));
+        form.add(puntaje);
+        form.add(new JLabel("Comentario (opcional)"));
+        form.add(comentario);
+        if (JOptionPane.showConfirmDialog(this, form, "Calificar", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        intentar(() -> {
+            Perfil calificado = calificaciones.calificar(USER_ID, contratacion.id(), (Integer) puntaje.getSelectedItem(),
+                    comentario.getText());
+            message("¡Gracias por calificar!", calificado.nombre() + " ahora tiene ★ " + calificado.reputacion()
+                    + " de reputación.");
+            showContracts();
+        });
+    }
+
+    /** RECHAZADA y CANCELADA son estados finales: solo se consulta el historial (regla 8). */
+    private void verHistorial(Contratacion contratacion) {
+        String lineas = String.join("\n", operaciones.verHistorial(USER_ID, contratacion.id()));
+        JOptionPane.showMessageDialog(this, lineas, "Historial · " + contratacion.titulo(),
+                JOptionPane.INFORMATION_MESSAGE);
     }
 }

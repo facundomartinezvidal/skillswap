@@ -2,6 +2,8 @@ package ar.edu.uade.skillswap.controllers;
 
 import ar.edu.uade.skillswap.model.Models.Contratacion;
 
+import java.util.List;
+
 /**
  * Las operaciones explícitas de la contratación que pide la consigna. La UI de la cátedra usa un
  * {@code avanzar} genérico; esta interfaz del equipo no cambia {@link UiControllers}.
@@ -28,4 +30,13 @@ public interface ContratacionOperaciones {
     Contratacion aceptarReprogramacion(String userId, String contratacionId);
 
     Contratacion rechazarReprogramacion(String userId, String contratacionId);
+
+    /** El historial de estados en texto, del primero al último: fecha, cambio, quién y motivo. */
+    List<String> verHistorial(String userId, String contratacionId);
+
+    /** Si quien mira la contratación es el cliente (el único que puede volver a solicitar). */
+    boolean esCliente(String userId, String contratacionId);
+
+    /** Después de un rechazo, el cliente pide de nuevo la misma publicación: es una contratación nueva. */
+    Contratacion volverASolicitar(String userId, String contratacionId);
 }

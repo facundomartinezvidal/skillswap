@@ -580,6 +580,35 @@ class ContratacionServiceTest {
     }
 
     @Nested
+    class VolverASolicitar {
+
+        @Test
+        void despuesDeUnRechazoCreaOtraContratacionConElMismoObjetivo() {
+            var rechazada = service.rechazar(PROVEEDOR, solicitar(CLIENTE, en72Horas).id(), "Sin lugar");
+
+            var nueva = service.volverASolicitar(CLIENTE, rechazada.id(), en30Horas.valor().toString(), "Otra vez");
+
+            assertNotEquals(rechazada.id(), nueva.id());
+            assertEquals("PENDIENTE", nueva.estado());
+            assertEquals(rechazada.publicacionId(), nueva.publicacionId());
+            assertEquals(en30Horas.valor().toString(), nueva.franjaId());
+            assertEquals("RECHAZADA", estadoGuardado(rechazada.id()), "la rechazada no se reabre");
+        }
+
+        @Test
+        void elDominioRechazaAlProveedorYALasQueNoEstanRechazadas() {
+            var pendiente = solicitar(CLIENTE, en72Horas);
+            var franja = en30Horas.valor().toString();
+
+            assertThrows(TransicionInvalidaException.class,
+                    () -> service.volverASolicitar(CLIENTE, pendiente.id(), franja, "Otra vez"));
+            service.rechazar(PROVEEDOR, pendiente.id(), "Sin lugar");
+            assertThrows(AccionNoPermitidaException.class,
+                    () -> service.volverASolicitar(PROVEEDOR, pendiente.id(), franja, "Otra vez"));
+        }
+    }
+
+    @Nested
     class Consultas {
 
         @Test

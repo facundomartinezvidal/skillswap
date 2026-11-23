@@ -222,6 +222,17 @@ public final class Contratacion {
         return calificacion;
     }
 
+    /**
+     * Antes de volver a pedir la misma publicación: solo el cliente y solo si el estado lo admite (RECHAZADA).
+     * No cambia nada; la solicitud nueva es otra contratación.
+     */
+    public void validarNuevaSolicitud(String actorId) {
+        requireCliente(actorId, "volver a solicitar");
+        if (!estado.admiteNuevaSolicitud()) {
+            throw new TransicionInvalidaException(estado.nombre(), "volver a solicitar");
+        }
+    }
+
     /** Si tiene un lugar tomado en su franja: el cupo se reserva al aceptar y se libera al cancelar. */
     public boolean ocupaCupo() {
         return estado.ocupaCupo();
