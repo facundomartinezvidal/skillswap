@@ -317,7 +317,7 @@ al arrancar la app) y Hibernate solo valida. Un cambio futuro va en una `V2`.
 
 ## Pruebas
 
-- `mvn test`: 579 tests. Los 26 de `infrastructure/persistencia` usan Testcontainers
+- `mvn test`: 580 tests. Los 26 de `infrastructure/persistencia` usan Testcontainers
   y se omiten sin Docker.
 - JaCoCo: reporte en `target/site/jacoco/index.html`. Dominio + aplicación: 99,6 % de
   líneas y 95,0 % de ramas; `mvn verify` exige al menos 80 % de líneas.

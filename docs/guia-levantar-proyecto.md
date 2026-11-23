@@ -69,7 +69,7 @@ Argumentos útiles:
 
 | Argumento | Qué hace |
 |---|---|
-| `--usuario user-ana` | Entra como otro usuario (login simulado). Sin este argumento entra `user-mateo`. |
+| `--usuario user-ana` | Entra como otro usuario (login simulado). Sin este argumento entra `user-mateo`. Con la app abierta, se cambia desde **⇄ Cambiar usuario** en la barra lateral. |
 | `--memoria` | Usa la opción C, sin base de datos. |
 
 Usuarios de demo: `user-mateo`, `user-ana`, `user-sofia`, `user-tomas`, `user-camila`, `user-lucia`,

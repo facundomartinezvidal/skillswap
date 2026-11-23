@@ -13,6 +13,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static ar.edu.uade.skillswap.ui.Theme.*;
 
@@ -23,6 +24,8 @@ public final class SkillSwapView extends JPanel {
     private final Models.Perfil perfilActivo;
     private final CalificacionController calificaciones;
     private final ContratacionOperaciones operaciones;
+    private final List<String> usuarios;
+    private final Consumer<String> cambiarUsuario;
     private JButton coins;
     private final UiControllers controllers;
     private final JPanel content=new JPanel(new BorderLayout());
@@ -43,7 +46,18 @@ public final class SkillSwapView extends JPanel {
      */
     public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
                          ContratacionOperaciones operaciones) {
+        this(controllers, userId, calificaciones, operaciones, List.of(), null);
+    }
+
+    /**
+     * Login simulado: con {@code cambiarUsuario} la barra lateral muestra el botón Cambiar usuario, que ofrece
+     * {@code usuarios} y le pasa el elegido a quien armó la vista (main), que la vuelve a crear con ese userId.
+     */
+    public SkillSwapView(UiControllers controllers, String userId, CalificacionController calificaciones,
+                         ContratacionOperaciones operaciones, List<String> usuarios, Consumer<String> cambiarUsuario) {
         this.controllers=controllers;
+        this.usuarios=List.copyOf(usuarios);
+        this.cambiarUsuario=cambiarUsuario;
         this.calificaciones=calificaciones;
         this.operaciones=operaciones;
         this.USER_ID=userId;
@@ -56,8 +70,31 @@ public final class SkillSwapView extends JPanel {
         JLabel logo=label("SkillSwap",new Font("SansSerif",Font.BOLD,25),Color.WHITE); logo.setAlignmentX(LEFT_ALIGNMENT); side.add(logo);
         JLabel sub=label("Aprendé. Compartí. Crecé.",SMALL,new Color(177,200,216)); sub.setAlignmentX(LEFT_ALIGNMENT); side.add(sub); side.add(Box.createVerticalStrut(28));
         side.add(nav("⌂  Inicio",this::showHome)); side.add(nav("⌕  Explorar",this::showExplore)); side.add(nav("▣  Mis publicaciones",this::showListings)); side.add(nav("✓  Contrataciones",this::showContracts)); side.add(nav("◈  SkillCoins",this::showWallet)); side.add(nav("●  Notificaciones",this::showNotifications)); side.add(nav("♙  Mi perfil",this::showProfile)); side.add(Box.createVerticalGlue());
+        if(cambiarUsuario!=null&&!usuarios.isEmpty()) side.add(nav("⇄  Cambiar usuario",this::elegirUsuario));
         JPanel user=new JPanel(new BorderLayout(10,0)); user.setOpaque(false); user.setBorder(new EmptyBorder(8,6,4,4)); user.setMaximumSize(new Dimension(Integer.MAX_VALUE,56)); user.setAlignmentX(LEFT_ALIGNMENT);
         JLabel avatar=avatar(iniciales(),36); user.add(avatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(perfilActivo.nombre(),H3,Color.WHITE));txt.add(label(perfilActivo.rol(),SMALL,new Color(177,200,216)));user.add(txt);side.add(user); return side;
+    }
+
+    /**
+     * Muestra los usuarios de la demo con su rol en la demo y avisa el elegido; si es el mismo, no hace nada.
+     * Todos los perfiles son PROFESIONAL: el rol que se muestra sale de si el usuario ofrece publicaciones
+     * (proveedor) o solo contrata (cliente). Debajo del combo, la bio del usuario seleccionado.
+     */
+    private void elegirUsuario(){
+        List<Models.Perfil> perfiles=usuarios.stream().map(id->controllers.perfiles().verPerfil(id)).toList();
+        JComboBox<String> combo=new JComboBox<>(perfiles.stream().map(p->p.nombre()+"  ·  "+rolEnLaDemo(p.id())+"  ("+p.id()+")").toArray(String[]::new));
+        JLabel bio=label("",SMALL,MUTED);
+        combo.addActionListener(e->bio.setText(perfiles.get(combo.getSelectedIndex()).bio()));
+        combo.setSelectedIndex(Math.max(0,usuarios.indexOf(USER_ID)));
+        JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Entrar como"));form.add(combo);form.add(bio);
+        if(JOptionPane.showConfirmDialog(this,form,"Cambiar usuario",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)!=JOptionPane.OK_OPTION)return;
+        String elegido=usuarios.get(combo.getSelectedIndex());
+        if(!elegido.equals(USER_ID))cambiarUsuario.accept(elegido);
+    }
+
+    private String rolEnLaDemo(String userId){
+        int propias=controllers.publicaciones().listarPropias(userId).size();
+        return propias>0?"Profesional, ofrece "+propias+(propias==1?" publicación":" publicaciones"):"Cliente, contrata mentorías";
     }
 
     private JButton nav(String text,Runnable action){JButton b=new JButton(text);b.setMaximumSize(new Dimension(Integer.MAX_VALUE,44));b.setHorizontalAlignment(SwingConstants.LEFT);b.setForeground(new Color(224,234,241));b.setBackground(NAVY);b.setBorder(new EmptyBorder(10,12,10,12));b.setFocusPainted(false);b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));b.addActionListener(e->action.run());return b;}
@@ -83,7 +120,7 @@ public final class SkillSwapView extends JPanel {
 
     private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(e->createListing());title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.titulo(),H3,TEXT),BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.WEST);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(e->intentar(()->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));row.add(toggle,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
 
-    private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,150);message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();}}
+    private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);JSpinner precio=campoPrecio();form.add(new JLabel("Precio (SkillCoins)"));form.add(precio);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){intentar(()->{controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,(Integer)precio.getValue());message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();});}}
 
     private void showContracts(){JPanel p=base();addSection(p,"Tus contrataciones","Avanzá el flujo para probar los estados del sistema");for(Contratacion x:controllers.contrataciones().listarContrataciones(USER_ID)){JPanel row=card(new BorderLayout(16,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,105));JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label(x.titulo(),H3,TEXT));txt.add(Box.createVerticalStrut(5));txt.add(label(x.contraparte()+"  ·  "+x.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")),BODY,MUTED));row.add(txt,BorderLayout.CENTER);row.add(pill(x.estado().name(),x.estado()==EstadoContratacion.COMPLETADA?TEAL:NAVY_2),BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));actions.setOpaque(false);if(x.estado()==EstadoContratacion.COMPLETADA&&calificaciones!=null){JButton rate=button("Calificar",true);rate.addActionListener(e->calificar(x));actions.add(rate);}boolean terminada=x.estado()==EstadoContratacion.RECHAZADA||x.estado()==EstadoContratacion.CANCELADA;if(terminada&&operaciones!=null){JButton hist=button("Ver historial",false);hist.addActionListener(e->intentar(()->verHistorial(x)));actions.add(hist);}if(x.estado()==EstadoContratacion.RECHAZADA&&operaciones!=null&&operaciones.esCliente(USER_ID,x.id())){JButton again=button("Volver a solicitar",true);again.addActionListener(e->intentar(()->{operaciones.volverASolicitar(USER_ID,x.id());message("¡Solicitud enviada!","Se creó una solicitud nueva para la misma publicación.");showContracts();}));actions.add(again);}if(x.estado()!=EstadoContratacion.COMPLETADA&&!terminada){JButton next=button("Avanzar estado",true);next.addActionListener(e->intentar(()->{controllers.contrataciones().avanzar(USER_ID,x.id());showContracts();}));actions.add(next);JButton cancel=button("Cancelar",false);cancel.addActionListener(e->intentar(()->{controllers.contrataciones().cancelar(USER_ID,x.id());showContracts();}));actions.add(cancel);}row.add(actions,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(11));}page("Contrataciones",p);}
 
@@ -106,6 +143,13 @@ public final class SkillSwapView extends JPanel {
             }
         }
         return iniciales.toString();
+    }
+
+    /** Precio de la publicación nueva: de a 10 SkillCoins, arranca en 150 y no admite cero ni negativos. */
+    private JSpinner campoPrecio() {
+        JSpinner precio = new JSpinner(new SpinnerNumberModel(150, 1, 100_000, 10));
+        ((JSpinner.DefaultEditor) precio.getEditor()).getTextField().setColumns(8);
+        return precio;
     }
 
     /** Ejecuta una acción de un botón y, si el sistema la rechaza, muestra el motivo sobre la ventana. */
