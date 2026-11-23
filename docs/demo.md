@@ -28,7 +28,7 @@ Al arrancar se aplican las migraciones de Flyway y se cargan los datos de demo u
 | Arquitectura limpia (Camila) | cliente | ACEPTADA | Mateo paga: el saldo baja y queda retenido |
 | Mentoría de Java (Lucía) | proveedor | CONFIRMADA | Mateo inicia y después completa: cobra |
 | Revisión de portfolio (Tomás) | cliente | CONFIRMADA | error: le toca al proveedor |
-| Excel (Martín) | cliente | CANCELADA | sin acciones; el reintegro ya se acreditó |
+| Excel (Martín) | cliente | CANCELADA | "Ver historial"; el reintegro ya se acreditó |
 
 ## Recorrido
 
@@ -42,7 +42,8 @@ Al arrancar se aplican las migraciones de Flyway y se cargan los datos de demo u
    - Java con Ana → "Avanzar estado": pasa a ACEPTADA (Mateo es el proveedor).
    - Arquitectura con Camila → "Avanzar estado": Mateo paga; ir a **SkillCoins** y mostrar el
      débito. El pago queda retenido en la garantía hasta completar.
-   - Java con Lucía → "Avanzar estado" dos veces: EN_CURSO y COMPLETADA. En SkillCoins aparece
+   - Java con Lucía → "Avanzar estado" dos veces: EN_CURSO y COMPLETADA. Después **"Calificar"**
+     (caso 10): puntaje y comentario; un segundo intento muestra el error del dominio. En SkillCoins aparece
      el cobro de Mateo.
    - Portfolio con Tomás → "Avanzar estado": el sistema lo rechaza con un mensaje claro
      (le toca al proveedor). Es el manejo uniforme de errores.
@@ -58,8 +59,8 @@ Al arrancar se aplican las migraciones de Flyway y se cargan los datos de demo u
 
 ## Lo que no tiene botón en la UI de la cátedra
 
-Calificar (caso 10), reprogramar, cargar franjas y cambiar la estrategia de recomendación
-(caso 7) están en las interfaces del equipo y se muestran con los tests:
+Reprogramar, cargar franjas y cambiar la estrategia de recomendación (caso 7) están en las
+interfaces del equipo y se muestran con los tests:
 
 ```bash
 mvn test -Dtest=CasosDeAceptacionTest
@@ -68,3 +69,11 @@ mvn test -Dtest=CasosDeAceptacionTest
 Ese test recorre los 10 casos de aceptación a través de los controllers. El caso 4
 (dos aceptaciones por el último cupo) y el caso 5 (pago sin saldo) se prueban además contra
 MySQL en `BackendJpaTest`, que necesita Docker.
+
+## Antes de la defensa
+
+- Base limpia para que los datos de demo estén como al principio: `docker compose down -v`
+  y `docker compose up -d`; con un MySQL instalado, `DROP DATABASE skillswap;` y
+  `CREATE DATABASE skillswap;`. La app vuelve a cargar la demo al arrancar.
+- El recorrido completo con dos usuarios (publicar → solicitar → aceptar → pagar → completar →
+  calificar) se hace abriendo la app con `--usuario user-mateo` y `--usuario user-sofia`.

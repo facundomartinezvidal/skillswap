@@ -1,0 +1,426 @@
+@startuml diagrama-clases-uml
+' Diagrama de clases de dominio y aplicación de SkillSwap, hecho a mano y legible.
+' Para el detalle completo, generado desde el código: docs/diagrama-clases.puml.
+' Los patrones van como estereotipos: <<State>>, <<Strategy>>, <<Decorator>>, <<Factory>>, <<Observer>>, <<Adapter>>.
+!pragma layout smetana
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1F3A4D
+  ArrowColor #1F3A4D
+  StereotypeFontColor #0E7C72
+}
+skinparam package {
+  BorderColor #8AA4B5
+  FontColor #1F3A4D
+}
+hide empty members
+
+title SkillSwap · Diagrama de clases (dominio y aplicación)
+
+' ===================== DOMINIO =====================
+package "domain.shared" {
+  class SkillCoins <<Value Object>> {
+    - valor : long
+    + sumar(otro : SkillCoins) : SkillCoins
+    + restar(otro : SkillCoins) : SkillCoins
+  }
+  class Puntaje <<Value Object>> {
+    - valor : int  {1..5}
+  }
+  class CambioEstado <<Value Object>> {
+    - desde : String
+    - hacia : String
+    - fecha : Instant
+    - actorId : String
+    - motivo : String
+  }
+  interface EventoDominio {
+    + tipo() : String
+  }
+  abstract class DomainException
+}
+
+package "domain.perfil" {
+  class Perfil <<Aggregate Root>> {
+    - userId : String
+    - tipo : TipoPerfil
+    - nombreVisible : String
+    - biografia : String
+    - zonaHoraria : ZoneId
+    - habilidades : Set<String>
+    - intereses : Set<String>
+    - canal : CanalNotificacion
+    - activo : boolean
+    + editarDatos(...)
+    + definirHabilidades(h : Set<String>)
+    + registrarCalificacion(p : Puntaje)
+    + darDeBaja(actor : String, motivo : String)
+  }
+  class Reputacion <<Value Object>> {
+    - sumaPuntajes : long
+    - cantidad : int
+    + promedio() : double
+  }
+  class DisponibilidadSemanal <<Value Object>> {
+    - dia : DayOfWeek
+    - inicio : LocalTime
+    - fin : LocalTime
+  }
+  enum TipoPerfil {
+    PROFESIONAL
+    ORGANIZACION
+  }
+  enum CanalNotificacion {
+    INTERNA
+    EMAIL
+    PUSH
+  }
+  interface PerfilRepository <<Port>>
+}
+
+package "domain.publicacion" {
+  class Publicacion <<Aggregate Root>> {
+    - id : PublicacionId
+    - autorId : String
+    - tipo : TipoPublicacion
+    - titulo : String
+    - categoria : String
+    - modalidad : Modalidad
+    - duracionEstimada : Duration
+    - cupo : int
+    - precioBase : SkillCoins
+    - etiquetas : Set<String>
+    - motivoCancelacion : String
+    + publicar(actor : String, ahora : Instant)
+    + pausar() / reanudar() / cerrar() / cancelar(motivo)
+    + agregarFranja(inicio, fin) : FranjaId
+    + agregarPromocion(p : Promocion)
+    + precioFinal() : SkillCoins
+    + reservarCupo(franja : FranjaId)
+  }
+  class FranjaDisponibilidad {
+    - id : FranjaId
+    - inicio : Instant
+    - fin : Instant
+    - reservados : int
+  }
+  enum TipoPublicacion {
+    OFERTA
+    DESAFIO
+  }
+  enum Modalidad {
+    REMOTA
+    PRESENCIAL
+  }
+  interface PublicacionRepository <<Port>>
+
+  package "state (publicación)" {
+    interface EstadoPublicacion <<State>> {
+      + publicar() : EstadoPublicacion
+      + pausar() : EstadoPublicacion
+      + reanudar() : EstadoPublicacion
+      + cerrar() : EstadoPublicacion
+      + cancelar() : EstadoPublicacion
+      + admiteSolicitudes() : boolean
+      + admiteReservas() : boolean
+    }
+    class Borrador
+    class Publicada
+    class Pausada
+    class Cerrada
+    class "Cancelada" as CanceladaPub
+  }
+
+  package "decorator" {
+    interface Precio <<Decorator>> {
+      + valor() : SkillCoins
+    }
+    class PrecioBase
+    class PrecioConPromocion {
+      - envuelto : Precio
+      - promocion : Promocion
+    }
+    interface Promocion {
+      + aplicar(precio : SkillCoins) : SkillCoins
+    }
+    class DescuentoPorcentual {
+      - porcentaje : int  {1..100}
+    }
+    class DescuentoFijo {
+      - monto : SkillCoins
+    }
+  }
+}
+
+package "domain.contratacion" {
+  class Contratacion <<Aggregate Root>> {
+    - id : ContratacionId
+    - publicacionId : PublicacionId
+    - clienteId : String
+    - proveedorId : String
+    - inicioSesion : Instant
+    - precioAcordado : SkillCoins
+    + {static} solicitar(...) : Contratacion
+    + aceptar() / rechazar(motivo)
+    + pagar() / iniciar() / completar()
+    + cancelar(actor, motivo, politica : PoliticaReintegro)
+    + proponerReprogramacion(...) / aceptarReprogramacion()
+    + calificar(autor, puntaje : Puntaje, comentario)
+  }
+  class Solicitud <<Value Object>> {
+    - mensaje : String
+    - objetivo : String
+    - franjaElegida : FranjaId
+  }
+  class Calificacion <<Value Object>> {
+    - autorId : String
+    - destinatarioId : String
+    - puntaje : Puntaje
+    - comentario : String
+  }
+  class PropuestaReprogramacion <<Value Object>> {
+    - propuestaPor : String
+    - franjaId : FranjaId
+    - inicio : Instant
+  }
+  class Reintegro <<Value Object>> {
+    - alCliente : SkillCoins
+    - alProveedor : SkillCoins
+  }
+  interface ContratacionRepository <<Port>>
+
+  package "state (contratación)" {
+    interface EstadoContratacion <<State>> {
+      + aceptar() : EstadoContratacion
+      + rechazar() : EstadoContratacion
+      + pagar() : EstadoContratacion
+      + iniciar() : EstadoContratacion
+      + completar() : EstadoContratacion
+      + cancelar() : EstadoContratacion
+      + admiteCalificacion() : boolean
+    }
+    class Pendiente
+    class Aceptada
+    class Confirmada
+    class EnCurso
+    class Completada
+    class Rechazada
+    class "Cancelada" as CanceladaCon
+  }
+
+  package "strategy" {
+    interface PoliticaReintegro <<Strategy>> {
+      + calcular(precio, inicioSesion, ahora) : Reintegro
+    }
+    class ReintegroPorAnticipacion {
+      100 % / 50 % / 0 % según 48 h y 24 h
+    }
+    class ReintegroTotal
+    class PoliticaReintegroFactory <<Factory>> {
+      + paraCancelacion(c : Contratacion, canceladorId) : PoliticaReintegro
+    }
+  }
+}
+
+package "domain.wallet" {
+  class Wallet <<Aggregate Root>> {
+    - titularId : String
+    - saldo : SkillCoins
+    + acreditar(importe, concepto)
+    + debitar(importe, concepto)
+  }
+  class Movimiento <<Value Object>> {
+    - tipo : TipoMovimiento
+    - importe : SkillCoins
+    - saldoResultante : SkillCoins
+    - concepto : String
+  }
+  enum TipoMovimiento {
+    CREDITO
+    DEBITO
+    REINTEGRO
+    ACREDITACION_DEMO
+  }
+  class RetencionDePagos <<Domain Service>> {
+    + retener(cliente, garantia, importe, ...)
+    + liberarAlProveedor(garantia, proveedor, importe, ...)
+    + repartir(garantia, cliente, proveedor, retenido, reintegro)
+  }
+  interface WalletRepository <<Port>>
+}
+
+package "domain.notificacion" {
+  class Notificacion <<Aggregate Root>> {
+    - destinatarioId : String
+    - tipo : String
+    - titulo : String
+    - detalle : String
+    - fecha : Instant
+    - leida : boolean
+    + marcarLeida(lector : String)
+  }
+  interface NotificacionRepository <<Port>>
+}
+
+' ===================== APLICACIÓN =====================
+package "application" {
+  class PerfilService
+  class PublicacionService
+  class BusquedaService
+  class ContratacionService
+  class WalletService
+  class NotificacionService
+
+  interface UnidadDeTrabajo <<Port>> {
+    + ejecutar(caso : Supplier<T>) : T
+  }
+  interface ServicioIdentidad <<Port>> {
+    + existe(userId) : boolean
+  }
+  interface BuscadorPublicaciones <<Port>> {
+    + buscar(criterios, pagina) : Pagina<Publicacion>
+  }
+
+  interface EstrategiaRecomendacion <<Strategy>> {
+    + recomendar(usuario : Perfil, candidatas, cantidad) : List<Publicacion>
+  }
+  class AfinidadPorHabilidades
+  class PopularidadReciente
+
+  class PublicadorEventos <<Observer · Subject>> {
+    + suscribir(s : SuscriptorEvento)
+    + publicar(e : EventoDominio)
+  }
+  interface SuscriptorEvento <<Observer>> {
+    + actualizar(e : EventoDominio)
+  }
+  class NotificadorDeInteresados
+
+  interface EnvioNotificacion <<Port>> {
+    + enviar(destinatarioId, titulo, detalle)
+  }
+  class CanalEnvioFactory <<Factory>> {
+    + para(canal : CanalNotificacion) : EnvioNotificacion
+  }
+}
+
+package "infrastructure (adaptadores)" {
+  class EmailAdapter <<Adapter>>
+  class PushAdapter <<Adapter>>
+}
+
+' ===================== RELACIONES =====================
+' Perfil
+Perfil "1" *-- "1" Reputacion
+Perfil "1" *-- "0..*" DisponibilidadSemanal
+Perfil "1" *-- "0..*" CambioEstado : historial
+Perfil --> TipoPerfil
+Perfil --> CanalNotificacion
+
+' Publicación
+Publicacion "1" *-- "0..*" FranjaDisponibilidad : franjas (≥1 para publicar)
+Publicacion "1" o-- "0..*" Promocion : promociones
+Publicacion "1" --> "1" EstadoPublicacion : estado
+Publicacion --> TipoPublicacion
+Publicacion --> Modalidad
+Publicacion ..> Precio : precioFinal()
+Publicacion "0..*" --> "1" Perfil : autorId
+
+EstadoPublicacion <|.. Borrador
+EstadoPublicacion <|.. Publicada
+EstadoPublicacion <|.. Pausada
+EstadoPublicacion <|.. Cerrada
+EstadoPublicacion <|.. CanceladaPub
+
+Precio <|.. PrecioBase
+Precio <|.. PrecioConPromocion
+PrecioConPromocion o-- "1" Precio : envuelto
+PrecioConPromocion --> "1" Promocion
+Promocion <|.. DescuentoPorcentual
+Promocion <|.. DescuentoFijo
+
+' Contratación
+Contratacion "0..*" --> "1" Publicacion : publicacionId
+Contratacion "0..*" --> "1" Perfil : clienteId
+Contratacion "0..*" --> "1" Perfil : proveedorId
+Contratacion "1" *-- "1" Solicitud
+Contratacion "1" *-- "0..2" Calificacion : una por parte
+Contratacion "1" *-- "0..1" PropuestaReprogramacion
+Contratacion "1" *-- "0..1" Reintegro
+Contratacion "1" *-- "0..*" CambioEstado : historial
+Contratacion "1" --> "1" EstadoContratacion : estado
+Contratacion ..> PoliticaReintegro : cancelar()
+Contratacion ..> EventoDominio : registra
+Calificacion --> Puntaje
+
+EstadoContratacion <|.. Pendiente
+EstadoContratacion <|.. Aceptada
+EstadoContratacion <|.. Confirmada
+EstadoContratacion <|.. EnCurso
+EstadoContratacion <|.. Completada
+EstadoContratacion <|.. Rechazada
+EstadoContratacion <|.. CanceladaCon
+
+PoliticaReintegro <|.. ReintegroPorAnticipacion
+PoliticaReintegro <|.. ReintegroTotal
+PoliticaReintegroFactory ..> PoliticaReintegro : crea
+PoliticaReintegro ..> Reintegro : calcula
+
+' Wallet
+Wallet "1" *-- "0..*" Movimiento
+Wallet "0..1" --> "1" Perfil : titularId
+Movimiento --> TipoMovimiento
+RetencionDePagos ..> Wallet
+
+' Notificación
+Notificacion "0..*" --> "1" Perfil : destinatarioId
+
+' Aplicación → dominio (puertos e inyección por constructor)
+PerfilService --> PerfilRepository
+PerfilService --> WalletRepository
+PerfilService --> ServicioIdentidad
+PerfilService --> UnidadDeTrabajo
+PublicacionService --> PublicacionRepository
+PublicacionService --> PerfilRepository
+BusquedaService --> BuscadorPublicaciones
+BusquedaService --> "1" EstrategiaRecomendacion
+ContratacionService --> ContratacionRepository
+ContratacionService --> PublicacionRepository
+ContratacionService --> WalletRepository
+ContratacionService --> RetencionDePagos
+ContratacionService --> PoliticaReintegroFactory
+ContratacionService --> UnidadDeTrabajo
+ContratacionService --> PublicadorEventos
+WalletService --> WalletRepository
+NotificacionService --> NotificacionRepository
+
+EstrategiaRecomendacion <|.. AfinidadPorHabilidades
+EstrategiaRecomendacion <|.. PopularidadReciente
+
+PublicadorEventos "1" o-- "0..*" SuscriptorEvento
+SuscriptorEvento <|.. NotificadorDeInteresados
+NotificadorDeInteresados --> NotificacionRepository
+NotificadorDeInteresados --> CanalEnvioFactory
+CanalEnvioFactory ..> EnvioNotificacion : elige
+EnvioNotificacion <|.. EmailAdapter
+EnvioNotificacion <|.. PushAdapter
+
+legend right
+  **Patrones**
+  State: EstadoPublicacion, EstadoContratacion
+  Strategy: PoliticaReintegro, EstrategiaRecomendacion
+  Simple Factory: PoliticaReintegroFactory, CanalEnvioFactory
+  Decorator: Precio / PrecioConPromocion
+  Observer: PublicadorEventos / SuscriptorEvento
+  Adapter: EmailAdapter, PushAdapter (y repos JPA)
+  ..
+  ""*--"" composición · ""o--"" agregación
+  ""-->"" asociación · ""..>"" dependencia
+  ""<|.."" implementa
+endlegend
+@enduml

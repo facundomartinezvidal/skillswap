@@ -67,13 +67,13 @@ mvn test
 mvn verify
 ```
 
-- `mvn test` corre los 564 tests y deja el reporte de cobertura de JaCoCo en
+- `mvn test` corre los 579 tests y deja el reporte de cobertura de JaCoCo en
   `target/site/jacoco/index.html`.
-- Los 24 tests de `infrastructure/persistencia` usan Testcontainers: levantan un MySQL
+- Los 26 tests de `infrastructure/persistencia` usan Testcontainers: levantan un MySQL
   en Docker, migran con Flyway y prueban los repositorios, la búsqueda, las restricciones
   y la concurrencia. Si Docker no está disponible, se omiten (no fallan).
 - `mvn verify` además exige al menos 80 % de líneas cubiertas en dominio + aplicación
-  (hoy 99,4 %).
+  (hoy 99,6 %).
 
 ## Código
 
@@ -91,6 +91,7 @@ src/main/java/ar/edu/uade/skillswap/
 
 ## Documentación
 
+- [`docs/guia-levantar-proyecto.md`](docs/guia-levantar-proyecto.md): paso a paso para instalar, abrir la app y correr los tests desde cero.
 - [`docs/arquitectura.md`](docs/arquitectura.md): capas, casos de uso, patrones y persistencia.
 - [`docs/informe-decisiones.md`](docs/informe-decisiones.md): decisiones en formato
   problema → alternativa → consecuencias → evidencia, patrones, SOLID/GRASP y casos de aceptación.
