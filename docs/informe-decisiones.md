@@ -196,8 +196,8 @@ Presentación (ui, model)  →  Controllers  →  Aplicación (Services, DTOs, p
 **D27. Adaptaciones a una UI que no se rediseña.**
 - **Problema:** la UI tiene un único botón "Avanzar estado", solicita sin franja y crea borradores sin cupo.
 - **Alternativa elegida:** `avanzar` decide según estado y rol (PENDIENTE y proveedor acepta; ACEPTADA y cliente paga; CONFIRMADA y proveedor inicia; EN_CURSO y proveedor completa; otro caso explica quién tiene que actuar). `solicitar` usa la primera franja futura con lugar. `crearBorrador` crea con cupo 1 y una franja a 7 días. Los listados de la UI piden la primera página de 50.
-- **Consecuencias:** la demo se puede hacer entera desde la UI; calificar, reprogramar y cargar franjas quedan en las interfaces del equipo y se prueban por tests.
-- **Evidencia:** `CasosDeAceptacionTest` (los diez casos de punta a punta a través de los controllers).
+- **Consecuencias:** la demo se puede hacer entera desde la UI, de publicar a calificar. Sin rediseñar las pantallas, la vista suma tres botones que reciben las interfaces del equipo por constructor: "Calificar" en las contrataciones COMPLETADA, y "Ver historial" en RECHAZADA y CANCELADA (estados finales: solo se consulta el historial). En RECHAZADA, el cliente tiene además "Volver a solicitar", que crea una contratación nueva sobre la misma publicación. Reprogramar y cargar franjas quedan en las interfaces del equipo y se prueban por tests.
+- **Evidencia:** `CasosDeAceptacionTest` (los diez casos de punta a punta a través de los controllers) y `ContratacionTerminadaTest` (historial, volver a solicitar y sus rechazos).
 
 **D28. Dos backends y datos de demo reproducibles.**
 - **Problema:** la demo no puede depender de que MySQL ande en la máquina del día.
@@ -254,15 +254,15 @@ Los diez casos también se recorren de punta a punta a través de los controller
 
 ## 9. Pruebas y cobertura
 
-- `mvn test` con Java 17: **564 tests, 0 fallos**. Los 24 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y se omiten si Docker no está disponible; en CI se ejecutan.
+- `mvn test` con Java 17: **573 tests, 0 fallos**. Los 26 de `infrastructure/persistencia` usan Testcontainers (MySQL en Docker) y se omiten si Docker no está disponible; en CI se ejecutan.
 - Cobertura medida con JaCoCo (`target/site/jacoco/index.html`), sin excluir clases:
 
 | Capa | Líneas | Ramas |
 |---|---|---|
 | Dominio | 99,7 % (939/942) | 96,1 % (271/282) |
-| Aplicación | 99,0 % (496/501) | 92,6 % (75/81) |
-| **Dominio + aplicación** | **99,4 % (1435/1443)** | **95,3 % (346/363)** |
-| Controllers | 91,4 % (213/233) | 74,4 % (58/78) |
+| Aplicación | 99,0 % (498/503) | 91,4 % (85/93) |
+| **Dominio + aplicación** | **99,4 % (1437/1445)** | **94,9 % (356/375)** |
+| Controllers | 91,7 % (232/253) | 73,9 % (65/88) |
 
 - `mvn verify` falla si dominio + aplicación bajan del 80 % de líneas (`jacoco:check`).
 - La infraestructura medida sin Docker da 36 % porque sus tests de MySQL quedan omitidos; la UI y el mock de la cátedra no se miden como objetivo.

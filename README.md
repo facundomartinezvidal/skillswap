@@ -67,9 +67,9 @@ mvn test
 mvn verify
 ```
 
-- `mvn test` corre los 564 tests y deja el reporte de cobertura de JaCoCo en
+- `mvn test` corre los 573 tests y deja el reporte de cobertura de JaCoCo en
   `target/site/jacoco/index.html`.
-- Los 24 tests de `infrastructure/persistencia` usan Testcontainers: levantan un MySQL
+- Los 26 tests de `infrastructure/persistencia` usan Testcontainers: levantan un MySQL
   en Docker, migran con Flyway y prueban los repositorios, la búsqueda, las restricciones
   y la concurrencia. Si Docker no está disponible, se omiten (no fallan).
 - `mvn verify` además exige al menos 80 % de líneas cubiertas en dominio + aplicación
