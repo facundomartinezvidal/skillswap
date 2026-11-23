@@ -352,7 +352,7 @@ Contratacion "1" *-- "1" Solicitud
 Contratacion "1" *-- "0..2" Calificacion : una por parte
 Contratacion "1" *-- "0..1" PropuestaReprogramacion
 Contratacion "1" *-- "0..1" Reintegro
-Contratacion "1" *-- "1..*" CambioEstado : historial
+Contratacion "1" *-- "0..*" CambioEstado : historial
 Contratacion "1" --> "1" EstadoContratacion : estado
 Contratacion ..> PoliticaReintegro : cancelar()
 Contratacion ..> EventoDominio : registra
