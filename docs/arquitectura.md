@@ -117,6 +117,10 @@ que la infraestructura no lance excepciones de negocio.
   deduce como la otra parte, así que nadie puede calificarse a sí mismo. El
   puntaje (`Puntaje`, en `domain/shared`) va de 1 a 5 y el comentario es
   opcional. Calificar no cambia el estado ni agrega un cambio al historial.
+- `RECHAZADA` no se reabre: el cliente puede volver a solicitar la misma
+  publicación, y eso crea otra contratación con el mismo objetivo. Lo valida el
+  dominio: `Contratacion.validarNuevaSolicitud(actor)` exige que sea el cliente y
+  `admiteNuevaSolicitud()` del State solo es `true` en `Rechazada`.
 - `Perfil` se identifica por el `userId` del servicio de identidad (un usuario
   tiene un solo perfil) y tiene un `TipoPerfil` fijo desde la creación:
   `PROFESIONAL` (publica ofertas) u `ORGANIZACION` (publica desafíos). Guarda

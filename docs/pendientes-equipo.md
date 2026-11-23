@@ -48,19 +48,18 @@ En `COMPLETADA` la consigna menciona "consultar comprobante". `ContratacionDTO` 
 
 Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no anda, se omiten. En el CI de GitHub corren. Antes de la defensa conviene correr `mvn test` en una máquina con Docker funcionando y confirmar que pasan los 579.
 
-## Estado al 20/11 (entrega: martes 24/11)
+## Estado al 23/11 (entrega: martes 24/11)
 
 **Hecho**
 
-- Todas las PRs del backend (#12 a #25) están en `main`: 569 tests y CI en verde.
-- PR #26: botón "Calificar", "Ver historial" y "Volver a solicitar" en las contrataciones RECHAZADA y CANCELADA, y el orden "Más reciente" (puntos 1, 2 y 3).
-- PR #27: historias de usuario (punto 5), diagrama de clases UML base en `docs/uml/` y la guía [`guia-levantar-proyecto.md`](guia-levantar-proyecto.md).
+- Todas las PRs (#4 a #27) están en `main`, con CI en verde: 579 tests, 0 fallos; dominio + aplicación con 99,6 % de líneas y 95,0 % de ramas.
+- Puntos 1, 2, 3 y 5 resueltos (PR #26 y #27). La regla de "volver a solicitar" quedó en el dominio (`Contratacion.validarNuevaSolicitud` y `admiteNuevaSolicitud()` del State).
+- Diagrama UML base en `docs/uml/`, historias de usuario y la guía [`guia-levantar-proyecto.md`](guia-levantar-proyecto.md).
 
 **Falta, en este orden**
 
-1. Revisar, aprobar y mergear #26 y #27 (con "Create a merge commit", base `main`).
-2. **Diagrama en StarUML** (punto 4): rehacerlo en StarUML a partir de `docs/uml/diagrama-clases-uml.png`, con relaciones, multiplicidades y patrones.
-3. **Informe en PDF** (punto 6): exportar `docs/informe-decisiones.md` y sumarle el diagrama de StarUML.
-4. **Limpieza final del repo**, cuando todo lo anterior esté mergeado: sacar `AGENTS.md`, la carpeta `.claude/` y `skills-lock.json`, que solo sirven para el desarrollo, y los enlaces que apuntan a ellos.
+1. **Diagrama en StarUML** (punto 4): rehacerlo en StarUML a partir de `docs/uml/diagrama-clases-uml.png`, con relaciones, multiplicidades y patrones.
+2. **Informe en PDF** (punto 6): exportar `docs/informe-decisiones.md` y sumarle el diagrama de StarUML.
+3. **Limpieza final del repo**: sacar `AGENTS.md`, la carpeta `.claude/` y `skills-lock.json`, que solo sirven para el desarrollo, y los enlaces que apuntan a ellos.
 
 Los puntos 7 (comprobante) y 8 (tests de MySQL con Docker) son opcionales.
