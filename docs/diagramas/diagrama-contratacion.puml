@@ -43,6 +43,7 @@ package "Application" as pkg_Application #F5FAFF {
       -publicadorEventos: PublicadorEventos
       -clock: Clock
       +solicitar(command: SolicitarContratacionCommand): ContratacionDTO
+      +volverASolicitar(String, String, String, String): ContratacionDTO
       +aceptar(userId: String, contratacionId: String): ContratacionDTO
       +rechazar(userId: String, contratacionId: String, motivo: String): ContratacionDTO
       +pagar(userId: String, contratacionId: String): ContratacionDTO
@@ -151,6 +152,7 @@ package "Domain" as pkg_Domain #FFFDF5 {
       +aceptarReprogramacion(actorId: String, ahora: Instant): FranjaId
       +rechazarReprogramacion(actorId: String, ahora: Instant): void
       +calificar(autorId: String, puntaje: Puntaje, comentario: String, ahora: Instant): Calificacion
+      +validarNuevaSolicitud(actorId: String): void
       +ocupaCupo(): boolean
       +esParticipante(userId: String): boolean
       +extraerEventos(): List<EventoDominio>
@@ -307,6 +309,7 @@ package "Domain" as pkg_Domain #FFFDF5 {
       +admiteReprogramacion(): boolean
       +ocupaCupo(): boolean
       +admiteCalificacion(): boolean
+      +admiteNuevaSolicitud(): boolean
     }
     class "Pendiente" as Pendiente <<record>> <<State>> {
       +nombre(): String
@@ -315,6 +318,7 @@ package "Domain" as pkg_Domain #FFFDF5 {
       +cancelar(): EstadoContratacion
     }
     class "Rechazada" as Rechazada <<record>> <<State>> {
+      +admiteNuevaSolicitud(): boolean
       +nombre(): String
     }
   }

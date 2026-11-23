@@ -171,6 +171,7 @@ package "domain.contratacion" {
     + cancelar(actor, motivo, politica : PoliticaReintegro)
     + proponerReprogramacion(...) / aceptarReprogramacion()
     + calificar(autor, puntaje : Puntaje, comentario)
+    + validarNuevaSolicitud(actor)
   }
   class Solicitud <<Value Object>> {
     - mensaje : String
@@ -203,6 +204,7 @@ package "domain.contratacion" {
       + completar() : EstadoContratacion
       + cancelar() : EstadoContratacion
       + admiteCalificacion() : boolean
+      + admiteNuevaSolicitud() : boolean
     }
     class Pendiente
     class Aceptada

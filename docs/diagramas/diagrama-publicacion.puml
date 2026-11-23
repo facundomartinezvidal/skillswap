@@ -24,6 +24,9 @@ hide empty members
 title SkillSwap - Módulo publicacion (dominio y aplicación)
 
 package "Application" as pkg_Application #F5FAFF {
+  package "Interfaces" as pkg_Application_Interfaces {
+    interface "UnidadDeTrabajo" as UnidadDeTrabajo #EEEEEE
+  }
   package "busqueda" as pkg_Application_busqueda {
     class "BusquedaService" as BusquedaService #EEEEEE
   }
@@ -42,6 +45,7 @@ package "Application" as pkg_Application #F5FAFF {
     class "PublicacionService" as PublicacionService {
       -publicacionRepository: PublicacionRepository
       -perfilRepository: PerfilRepository
+      -unidadDeTrabajo: UnidadDeTrabajo
       -clock: Clock
       +crearBorrador(userId: String, datos: DatosPublicacionCommand): PublicacionDTO
       +editar(userId: String, publicacionId: String, datos: DatosPublicacionCommand): PublicacionDTO
@@ -282,6 +286,7 @@ BusquedaService --> "1" PublicacionRepository : publicacionRepository
 ContratacionService --> "1" PublicacionRepository : publicacionRepository
 PerfilService --> "1" PublicacionRepository : publicacionRepository
 PerfilDTO --> "*" PublicacionDTO : publicacionesActivas
+PublicacionService --> "1" UnidadDeTrabajo : unidadDeTrabajo
 PublicacionService --> "1" PerfilRepository : perfilRepository
 PublicacionService --> "1" PublicacionRepository : publicacionRepository
 PublicacionDTO --> "*" FranjaDTO : franjas
