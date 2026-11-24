@@ -157,7 +157,7 @@ La consigna (sección 13) pide un **diagrama de clases completo de dominio y apl
 
 | Archivo | Qué es | Uso |
 |---|---|---|
-| `docs/SkillSwap.mdj` | **El diagrama en StarUML**: un solo diagrama con todas las capas (Presentación, Controllers, Aplicación, Dominio, Infraestructura) y las 217 clases, generado por `docs/uml/generador/` | Es el entregable. Se regenera; no se edita a mano |
+| `docs/SkillSwap.mdj` | **El diagrama en StarUML**: el diagrama completo con todas las capas (Presentación, Controllers, Aplicación, Dominio, Infraestructura) y las 217 clases, más una vista por capa (`Capa …`: las clases de la capa completas y, solo con el nombre, las de capas internas que usa o implementa), generado por `docs/uml/generador/` | Es el entregable. Se regenera; no se edita a mano. `verificar.py` revisa los 6 diagramas y deja un SVG por diagrama en la carpeta que se le pasa |
 | `docs/uml/generador/` | `generar.py` arma el `.mdj` y `verificar.py` lo exporta a SVG con StarUML y comprueba que nada se superponga | Ver "Flujo de trabajo" |
 | `docs/uml/diagrama-clases-uml.puml` (+ `.png`, `.svg`) | Diagrama de dominio hecho a mano en PlantUML | Referencia; tiene asociaciones entre módulos que el código no tiene |
 | `docs/diagrama-clases.puml`, `docs/diagramas/`, `docs/diagramas.md` | Generados desde el código, uno por módulo (PlantUML y Mermaid) | Referencia rápida |

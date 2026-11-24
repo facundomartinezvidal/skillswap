@@ -26,11 +26,10 @@ Cada punto dice qué pasa, por qué importa y por dónde empezar.
 
 El backend soporta los cuatro órdenes que pide la consigna (`OrdenBusqueda`, y `BusquedaControllerImpl.aOrden` ya reconoce el texto `"Más reciente"`), pero el combo de `showExploreWith()` solo ofrece tres. Basta con agregar `"Más reciente"` al arreglo del combo.
 
-### 4. Diagrama de clases en StarUML (base lista: `docs/uml/diagrama-clases-uml.png`; falta pasarlo a StarUML)
+### 4. ~~Diagrama de clases en StarUML~~ (resuelto)
 
-- La consigna pide el diagrama de dominio y aplicación **en StarUML**, con relaciones, multiplicidades y patrones identificados.
-- `docs/SkillSwap.mdj` se generó desde el código y el JSON es válido, pero **nunca se abrió en StarUML** (no había licencia) y los elementos quedaron acomodados en grilla.
-- **Qué hacer:** abrirlo en StarUML, ordenar el layout por módulo, revisar las multiplicidades y marcar los patrones (State, Strategy, Simple Factory, Decorator, Observer, Adapter). Como referencia sirven `docs/diagrama-clases.png` y los Mermaid de `docs/diagramas.md`. Si es más fácil, rehacerlo a mano a partir de esos diagramas.
+- [SkillSwap.mdj](SkillSwap.mdj) contiene el diagrama completo y cinco vistas por capa, generados desde el código. El diagrama completo se abre por defecto. Para cambiar de vista, hacé doble clic en un diagrama `Capa …` en el **Model Explorer** de StarUML. Si el panel está oculto, usá **View → Show Sidebar**. **View → Fit To Window** encuadra el diagrama activo.
+- Los seis diagramas se exportaron desde StarUML y el verificador terminó con `TOTAL 0`. La incorporación del SVG al informe sigue en el punto 6.
 
 ### 5. ~~Historias de usuario~~ (resuelto: `docs/historias-de-usuario.md`)
 
@@ -56,12 +55,11 @@ Los 26 tests de `infrastructure/persistencia` usan Testcontainers: si Docker no 
 - Puntos 1, 2, 3 y 5 resueltos (PR #26 y #27). La regla de "volver a solicitar" quedó en el dominio (`Contratacion.validarNuevaSolicitud` y `admiteNuevaSolicitud()` del State).
 - UI: "Cambiar usuario" en la barra lateral (#29) y precio en el formulario de nueva publicación (#30).
 - Revisión contra el PDF (#31): solicitar con franja, mensaje y objetivo (4.4); franjas y cupo cargados por el autor al crear la publicación; botones concretos en Contrataciones, más Rechazar, Reprogramar y Comprobante; listados de publicaciones propias y recomendaciones paginados; `correr.sh`.
-- Diagrama UML base en `docs/uml/`, historias de usuario y la guía [`guia-levantar-proyecto.md`](guia-levantar-proyecto.md).
+- Diagrama de clases en [StarUML](SkillSwap.mdj), historias de usuario y la guía [`guia-levantar-proyecto.md`](guia-levantar-proyecto.md).
 
 **Falta, en este orden**
 
-1. **Diagrama en StarUML** (punto 4): rehacerlo en StarUML a partir de `docs/uml/diagrama-clases-uml.png`, con relaciones, multiplicidades y patrones.
-2. **Informe en PDF** (punto 6): exportar `docs/informe-decisiones.md` y sumarle el diagrama de StarUML.
-3. **Limpieza final del repo**: sacar `AGENTS.md`, la carpeta `.claude/` y `skills-lock.json`, que solo sirven para el desarrollo, y los enlaces que apuntan a ellos.
+1. **Informe en PDF** (punto 6): exportar `docs/informe-decisiones.md` y sumarle el diagrama de StarUML.
+2. **Limpieza final del repo**: sacar `AGENTS.md`, la carpeta `.claude/` y `skills-lock.json`, que solo sirven para el desarrollo, y los enlaces que apuntan a ellos.
 
 El punto 8 (tests de MySQL con Docker) es opcional: con Docker andando pasan los 606.

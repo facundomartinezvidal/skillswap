@@ -1,15 +1,21 @@
 """Ancho de texto en px con las métricas reales de Liberation Sans (métricamente igual a Arial)."""
+import os
 import struct
 
-FUENTES = {False: '/usr/share/fonts/liberation/LiberationSans-Regular.ttf',
-           True: '/usr/share/fonts/liberation/LiberationSans-Bold.ttf'}
+FUENTES = {False: ['/usr/share/fonts/liberation/LiberationSans-Regular.ttf',  # Linux
+                    '/System/Library/Fonts/Supplemental/Arial.ttf'],  # macOS (Arial: mismas métricas)
+           True: ['/usr/share/fonts/liberation/LiberationSans-Bold.ttf',
+                  '/System/Library/Fonts/Supplemental/Arial Bold.ttf']}
 _cache = {}
 
 
 def _cargar(bold):
     if bold in _cache:
         return _cache[bold]
-    data = open(FUENTES[bold], 'rb').read()
+    ruta = next((f for f in FUENTES[bold] if os.path.exists(f)), None)
+    if ruta is None:
+        raise FileNotFoundError(f'no está Liberation Sans ni Arial: {FUENTES[bold]}')
+    data = open(ruta, 'rb').read()
     n = struct.unpack('>H', data[4:6])[0]
     tablas = {}
     for i in range(n):

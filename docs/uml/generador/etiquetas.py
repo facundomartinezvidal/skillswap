@@ -131,7 +131,7 @@ def caja_segmento(p, q):
 
 CANDIDATOS_EXTREMO = [(a, d) for d in (16, 22, 30, 40, 52, 66, 84, 104, 126, 150, 180) for a in
                       (0.45, -0.45, 0.75, -0.75, 1.1, -1.1, 0.25, -0.25, 1.45, -1.45, 1.9, -1.9, 0.12, -0.12,
-                       2.4, -2.4)]
+                       2.4, -2.4, 0.6, -0.6, 1.3, -1.3, 2.8, -2.8, 0.35, -0.35, 0.9, -0.9, 1.65, -1.65)]
 CANDIDATOS_MEDIO = [(a, d) for d in (11, 16, 24, 34, 46, 60, 78, 98) for a in
                     (1.5708, -1.5708, 1.2, -1.2, 1.9, -1.9, 0.9, -0.9, 2.3, -2.3)]
 
@@ -146,8 +146,11 @@ def ubicar(etqs, aristas, obstaculos):
         for p, q in zip(pts, pts[1:]):
             g_seg.agregar(caja_segmento(p, q), (i, p, q))
         extremos.append((pts[0], pts[-1]))
+    # una multiplicidad solo se confunde con el extremo de otra asociación (las demás relaciones no llevan)
     g_ext = Grilla()
     for i, (p0, p1) in enumerate(extremos):
+        if aristas[i]['r']['tipo'] not in ('assoc', 'comp', 'agg'):
+            continue
         g_ext.agregar((p0[0] - 1, p0[1] - 1, 2, 2), (i, p0))
         g_ext.agregar((p1[0] - 1, p1[1] - 1, 2, 2), (i, p1))
 
@@ -161,7 +164,7 @@ def ubicar(etqs, aristas, obstaculos):
                 total += 10000
         for _, (i, p, q) in g_seg.cerca((r[0] - PAD, r[1] - PAD, r[2] + 2 * PAD, r[3] + 2 * PAD)):
             if segmento_cruza(r, p, q, PAD):
-                total += 1500 if i == e['arista'] else 2000
+                total += 4000 if i == e['arista'] else 5000  # sobre una línea: se lee mal
         if e['pos'] != 1:
             propio = extremos[e['arista']][0 if e['pos'] == 2 else 1]
             d_propio = math.dist(c, propio)
