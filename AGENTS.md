@@ -149,6 +149,103 @@ Lo que la consigna pide y `UiControllers` no tenía ya está implementado y prob
 - Las decisiones de diseño van al informe PDF con el formato problema → alternativa elegida → consecuencias → evidencia.
 - Documentación nueva del proyecto: en `docs/`.
 
+## Diagrama de clases en StarUML (entregable)
+
+La consigna (sección 13) pide un **diagrama de clases completo de dominio y aplicación en StarUML, con relaciones, multiplicidades y patrones identificados**, y que se sume al informe en PDF. Es el pendiente principal de `docs/pendientes-equipo.md` (punto 4). Estas pautas salen de las guías de la materia que el equipo armó para los parciales (`proceso-desarrollo-software/guias/plantuml-diagramas.md`, `convenciones-de-nombres.md` y `arquitectura-en-el-parcial.md`) y de las resoluciones oficiales del profesor (examen 15 y la resolución propia del examen 18).
+
+### Qué hay hoy en el repo
+
+| Archivo | Qué es | Uso |
+|---|---|---|
+| `docs/SkillSwap.mdj` | **El diagrama en StarUML**: un solo diagrama con todas las capas (Presentación, Controllers, Aplicación, Dominio, Infraestructura) y las 217 clases, generado por `docs/uml/generador/` | Es el entregable. Se regenera; no se edita a mano |
+| `docs/uml/generador/` | `generar.py` arma el `.mdj` y `verificar.py` lo exporta a SVG con StarUML y comprueba que nada se superponga | Ver "Flujo de trabajo" |
+| `docs/uml/diagrama-clases-uml.puml` (+ `.png`, `.svg`) | Diagrama de dominio hecho a mano en PlantUML | Referencia; tiene asociaciones entre módulos que el código no tiene |
+| `docs/diagrama-clases.puml`, `docs/diagramas/`, `docs/diagramas.md` | Generados desde el código, uno por módulo (PlantUML y Mermaid) | Referencia rápida |
+
+### Flujo de trabajo
+
+1. **Generar** (necesita Graphviz, el comando `dot`):
+   ```bash
+   python3 docs/uml/generador/generar.py src/main/java/ar/edu/uade/skillswap docs/SkillSwap.mdj
+   ```
+   - El modelo (clases, atributos, operaciones, herencia) sale del código. Las relaciones del dominio, con sus multiplicidades, están declaradas en `relaciones.py`; las de las otras capas salen de los campos (asociaciones), de `implements`/`extends` y del uso en el código (dependencias de clases sueltas).
+   - Cada módulo se arma con dot por separado (`layout.py`); los módulos van en filas fijas con todas las dependencias apuntando hacia el dominio (las capas externas arriba, Dominio abajo) y las relaciones entre módulos van en ángulo recto por pasillos, cada una en su carril.
+   - Las etiquetas (multiplicidades, nombres, estereotipos) las ubica `etiquetas.py`: StarUML dibuja cada una en `punto + distancia·(cos(θ−alpha), sin(θ−alpha))` y respeta el `alpha`/`distance` que trae el `.mdj`, así que se eligen para que no pisen nada.
+   - Las raíces de composición (`BackendJpa`, `BackendEnMemoria`, `DatosDemo`, `SkillSwapControllers`) tienen una dependencia «create» al paquete que arman en vez de una asociación por campo: sus campos quedan tipados en la caja.
+2. **Verificar siempre antes de entregar o commitear**:
+   ```bash
+   python3 docs/uml/generador/verificar.py docs/SkillSwap.mdj /tmp/SkillSwap.svg
+   ```
+   Exporta con StarUML y revisa sobre lo dibujado: etiquetas que se pisan entre sí o con cajas, títulos o líneas; cajas superpuestas o fuera de su paquete; texto fuera de su caja; líneas que cruzan cajas o títulos; líneas encimadas, paralelas pegadas o con cruces rasantes; nudos; multiplicidades ambiguas; y que StarUML haya ubicado cada etiqueta donde se previó. Tiene que terminar en `TOTAL 0`. Además, mirar el PNG (`staruml image docs/SkillSwap.mdj -f png -o x.png`) completo y por zonas: el verificador no juzga la estética general.
+3. **No retocar el `.mdj` a mano en StarUML**: se pierde al regenerar. Si algo no queda bien, se corrige en el generador.
+4. **Exportar** desde StarUML (*File → Export Diagram As → SVG*) y pegar el SVG en el informe, en una **página horizontal**: es vectorial y se puede ampliar. En modo de prueba, StarUML exporta con la marca "UNREGISTERED".
+5. **Versionar** el `.mdj` y el generador. El PDF del informe no se versiona (`.gitignore`).
+
+### Cómo organizar el diagrama
+
+- **Un solo diagrama con todas las capas bien separadas**, cada una como paquete de color con sus módulos y subpaquetes adentro (lo pidió el equipo para la presentación).
+- **Capas como `UMLPackage` con color de fondo pastel**, una por capa y con las clases adentro, como en la resolución oficial del examen 15. Así el diagrama muestra solo qué va en cada capa:
+
+  | Capa | Color |
+  |---|---|
+  | Dominio | `#DFFFDF` verde |
+  | Aplicación | `#E3ECFF` azul (lo único fijo en los diagramas del profesor: Application va en azul) |
+  | Infraestructura | `#FFE8DF` durazno |
+  | Presentación / controllers | `#FFE5E5` rosa |
+  | Proveedor externo simulado (Adaptee) | `#EFEFEF` gris, en su propia caja: no es una capa nuestra |
+
+- **Alcance:** todas las clases de todas las capas (la consigna pide como mínimo dominio y aplicación). Las flechas entre capas apuntan siempre hacia adentro: ninguna sale de Dominio o Aplicación hacia Infraestructura, y ninguna asociación une módulos de dominio (solo ids).
+- **Dónde va cada patrón** (regla de dependencias: la interfaz adentro, la implementación afuera):
+  - Dominio: State (`domain/publicacion/state`, `domain/contratacion/state`), Strategy y Simple Factory de reintegro (`domain/contratacion/strategy`), Decorator (`domain/publicacion/decorator`), eventos (`domain/*/evento`) y los puertos de repositorio.
+  - Aplicación: Strategy de recomendación (`EstrategiaRecomendacion` y `busqueda/recomendacion`), Observer (`PublicadorEventos`, `SuscriptorEvento`, `NotificadorDeInteresados`), Simple Factory de canal (`CanalEnvioFactory`) y los puertos `ServicioIdentidad`, `EnvioNotificacion`, `UnidadDeTrabajo` y `BuscadorPublicaciones`.
+  - Infraestructura: los Adapter concretos y lo que envuelven.
+
+### Notación (lo que se corrige)
+
+- **Los nombres son los del código, tal cual.** Las guías del parcial piden prefijo `I` en las interfaces, pero este TP es un proyecto Java donde el diagrama tiene que poder rastrearse en el código: `PublicacionRepository`, `EstrategiaRecomendacion`, `PoliticaReintegro`, sin `I`. No renombrar ni "mejorar" nombres.
+- **Interfaces distinguibles**: con el estereotipo «interface» o con la notación de círculo de StarUML (la que usa el profesor). Si no se distinguen de las clases, se pierde el ítem "interfaces".
+- **Atributos privados (`-`) y operaciones públicas (`+`), todos con tipo**: `-precioBase: SkillCoins`, `+reservarCupo(franjaId: FranjaId): void`. Parámetros como `nombre: Tipo` (no al revés). Primitivos en minúscula (`long`, `int`, `boolean`) y clases en mayúscula (`String`, `Instant`).
+- **Colecciones tipadas**: `List<FranjaDisponibilidad>`, `Set<String>`. **En StarUML, un `Map` va con punto y coma** (`Map<String;Perfil>`), porque StarUML usa la coma como separador interno y parte el tipo al guardar. Hoy ningún campo del modelo es un `Map`; vale para cualquier tipo genérico con dos parámetros.
+- **Abstracto marcado** (clase y método `{abstract}`); los `enum` como `UMLEnumeration` (`TipoPerfil`, `Modalidad`, `CanalNotificacion`); los `record` value objects con estereotipo «Value Object».
+- **Estereotipo de patrón** en cada participante, como en `docs/uml/diagrama-clases-uml.puml`: «State», «Strategy», «SimpleFactory», «Decorator», «Observer», «Adapter».
+
+### Relaciones y multiplicidades
+
+| Relación | En StarUML | Cuándo |
+|---|---|---|
+| Composición ◆ | rombo lleno del lado del todo | La parte no existe sin el agregado y no se comparte (`Publicacion` ◆ `FranjaDisponibilidad`) |
+| Agregación ◇ | rombo hueco del lado del todo | Contiene partes que viven solas (un Service con sus estrategias) |
+| Asociación | línea con flecha de navegación, nombre (`+usa`, `+posee`) y multiplicidad en los dos extremos | Un campo que referencia a otra clase |
+| Dependencia | punteada con flecha abierta | Usa sin guardar: Service → DTO, Service → command |
+| Realización | punteada con triángulo hueco | Clase que implementa una interfaz |
+| Generalización | sólida con triángulo hueco | Herencia; sin multiplicidad |
+
+**Las multiplicidades salen del código**: campo obligatorio `1`; campo que puede ser nulo `0..1`; `List`/`Set` `0..*` (o `1..*` si el dominio exige al menos uno). Con los campos reales:
+
+- `Publicacion` ◆ `FranjaDisponibilidad` `0..*`, ◆ `Promocion` `0..*`, ◆ `CambioEstado` `0..*`, → `EstadoPublicacion` `1`, → `SkillCoins` `1` (precio base). Al menos una franja se exige al publicar, no al crear: `0..*`.
+- `Contratacion` → `Solicitud` `1`, → `EstadoContratacion` `1`, → `PropuestaReprogramacion` `0..1`, → `Reintegro` `0..1`, ◆ `CambioEstado` `0..*`, ◆ `Calificacion` `0..*` (a lo sumo 2: una por participante).
+- `Perfil` → `Reputacion` `1`, ◆ `DisponibilidadSemanal` `0..*`, → `CanalNotificacion` `1`, ◆ `CambioEstado` `0..*`.
+- `Wallet` → `SkillCoins` `1` (saldo), ◆ `Movimiento` `0..*`.
+
+**Entre módulos no hay asociación.** Por la decisión "módulos solo por id", `Contratacion` guarda `publicacionId: PublicacionId` y `franjaId: FranjaId`, y las personas son `String` (`clienteId`, `proveedorId`, `autorId`). Se dibujan como atributos, nunca como una línea `Contratacion → Publicacion`. Una línea así contradice el código y el informe.
+
+### Patrones identificados en el dibujo
+
+- **Una nota por patrón, en el participante que define el rol**, con tres renglones: el rol en negrita, la variación que resuelve y qué se rompería sin él. Ejemplo para `PoliticaReintegro`: **STRATEGY** · reintegro 100/50/0 % o total según quién cancela · otra política es otra clase, `ContratacionService` no cambia. Lo mismo para State (×2), Decorator, Simple Factory (×2), Observer y Adapter.
+- **Todas las notas del mismo lado** (abajo de la clase) y **solo en los roles de patrón**: notas de lados distintos hacen que las cajas se reacomoden, y una nota por clase vuelve ilegible el diagrama. Cuatro o cinco líneas cortas, sin repetir lo que la caja ya dice ni teoría de manual.
+- Los GRASP y SOLID, que son transversales, van al informe o a una leyenda aparte, no en notas.
+
+### Antes de exportar
+
+- [ ] Cada clase del diagrama existe en el código con ese nombre, y cada agregado de dominio está (Publicacion, Contratacion, Perfil, Wallet, Notificacion, con sus entidades internas y value objects).
+- [ ] Ninguna clase suelta (sin relaciones y sin motivo) ni relación duplicada (por ejemplo, una agregación y una composición entre las mismas dos clases).
+- [ ] Todas las asociaciones tienen multiplicidad en los dos extremos y nombre; las etiquetas no se superponen con las líneas.
+- [ ] Interfaces distinguibles; realizaciones punteadas; abstractos marcados.
+- [ ] Ninguna flecha de Dominio o Aplicación hacia Infraestructura; ninguna asociación entre módulos de dominio.
+- [ ] Los 6 patrones con estereotipo y nota: State, Strategy, Simple Factory, Decorator, Observer y Adapter.
+- [ ] `verificar.py` termina en `TOTAL 0` y el PNG se revisó completo y por zonas.
+- [ ] El diagrama exportado en SVG y pegado en el informe en página horizontal.
+
 ## Skills disponibles
 
 Instaladas en `.claude/skills/` y registradas en `skills-lock.json`:
